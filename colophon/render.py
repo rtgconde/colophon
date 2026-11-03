@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render every page of every book in books.json to JPEG, and dump the PDF text layer with word boxes.
 
-Runs on hub. Idempotent: a book whose render report says complete is skipped, so it can be re-run after a crash.
+Runs on the hub. Idempotent: a book whose render report says complete is skipped, so it can be re-run after a crash.
 
     render.py --root /srv/colophon [--jobs 12] [--long-side 2000] [--only 7001,7002]
 

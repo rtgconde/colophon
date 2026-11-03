@@ -3,9 +3,9 @@
 Every figure that Muse Spark read (`read/<book>/<nnnn>.json`, `is_figure: true`) becomes one point in Qdrant. Its text
 is embedded with bge-m3, and `serve.py` searches it.
 
-- **Page:** <http://hub:8102> (private network or LAN; `hub` is the coordinator host). No login.
+- **Page:** <http://hub:8102> (private network). No login.
 - **Code:** `colophon/index.py` (indexer, also the shared helpers), `colophon/serve.py` (stdlib `http.server`),
-  `colophon/static/` (one HTML page, css, js, three IBM Plex Serif woff2 files copied from the owner's wiki reader).
+  `colophon/static/` (one HTML page, css, js, three IBM Plex Serif woff2 files).
   It is deployed to `/srv/colophon/app/`.
 - **Units:** `colophon-index.service` (`--loop`, rescans every 2 min) and `colophon-serve.service` (:8102). Both are
   system units running as `colophon` with the venv `~/.venvs/colophon` (Pillow only; everything else is stdlib).
@@ -16,7 +16,7 @@ is embedded with bge-m3, and `serve.py` searches it.
 |---|---|
 | Vectors | Qdrant on mlbox, `http://mlbox:6333`, collection **`colophon_figures`** (1024-d, cosine). Payload indexes: `book` (int), `kind`, `artist`, `artist_norm`, `work_key`, `page_kind`. No other collection is touched. |
 | Embeddings | infinity `BAAI/bge-m3` on mlbox. It is bound to mlbox's **127.0.0.1:7997 only**, so hub cannot reach it over the private network. Each process opens its own `ssh -N -L` tunnel to mlbox: the indexer on `127.0.0.1:17997`, the server on `127.0.0.1:17996`. A tunnel uses its own connection (`ControlPath=none`), is restarted on failure, and is closed when the process exits. Set `COLOPHON_EMBED_URL` to skip the tunnel. |
-| Qdrant key | `QDRANT_API_KEY` in `~/.config/colophon/meta.env` (colophon, 0600). It is the sealed `qdrant.api_key`, read by the units through `EnvironmentFile=` and by the scripts themselves as a fallback. |
+| Qdrant key | `QDRANT_API_KEY` in `~/.config/colophon/meta.env` (colophon, 0600). It is read by the units through `EnvironmentFile=` and by the scripts themselves as a fallback. |
 | Index state | `/srv/colophon/index/state.db` (SQLite, WAL). Table `pages` holds one row per read file with its mtime and figure count. Table `figures` holds one row per indexed figure with its payload; it backs the Works view and the summaries. |
 | Summaries | `/srv/colophon/index/books.json` (all books) and `index/books/<id>.json`, rewritten after every pass that changed something. |
 | Caches | `index/thumbs/<book>/<file>.jpg` (480 px crop thumbnails) and `index/outlined/<book>-<nnnn>-<k>.jpg` (the page with the figure outlined). Both are rebuilt when their source is newer. It is safe to delete them. |
@@ -60,7 +60,7 @@ contain `/` or start with `.`, and the realpath must stay under its base. `..`, 
 A hit carries its payload plus `score`, `view` (the `/page/...` link), `crop_url` and `thumb_url`.
 
 The page view links the **MoMA PDF** at the page (`https://www.moma.org/documents/moma_catalogue_<moma>_<moma_doc>.pdf#page=N`,
-the pattern from `the collection script`) and the **exhibition page**
+the pattern the catalogues were collected with) and the **exhibition page**
 (`https://www.moma.org/calendar/exhibitions/<moma>`). It shows the **Calibre book id** as text; there is no
 guaranteed Calibre URL.
 
@@ -90,7 +90,7 @@ scp deploy/hub/colophon-index.service deploy/hub/colophon-serve.service hub:/tmp
 ssh hub 'sudo install -m 644 /tmp/colophon-index.service /tmp/colophon-serve.service /etc/systemd/system/ \
           && sudo systemctl daemon-reload && sudo systemctl enable --now colophon-index colophon-serve'
 
-# on hub
+# on the hub
 sudo systemctl start|stop|restart colophon-index colophon-serve
 journalctl -u colophon-index -f            # "indexed N pages, M figures" per pass, then totals
 journalctl -u colophon-serve -f
@@ -108,13 +108,13 @@ sudo systemctl start colophon-index
 `curl -X DELETE -H "api-key: $QDRANT_API_KEY" http://mlbox:6333/collections/colophon_figures`,
 then `--rebuild`.
 
-## Firewall (ufw on hub)
+## Firewall (ufw on the hub)
 
 These rules were added on 2026-11-03:
 
 ```
 sudo ufw allow from <lan-subnet> to any port 8102 proto tcp comment "Colophon search (LAN)"
-sudo ufw allow from <vpn-subnet>  to any port 8102 proto tcp comment "Colophon search (private network)"
+sudo ufw allow from <vpn-subnet> to any port 8102 proto tcp comment "Colophon search (private network)"
 ```
 
 To remove them, run `sudo ufw status numbered` and then `sudo ufw delete <n>`, highest number first.

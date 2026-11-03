@@ -10,8 +10,8 @@ into figure crops. The contract is docs/PROTOCOL.md; this is its server side.
     coordinator.py --reprocess 13183      # re-run post-processing for a book's done pages (after a rule change)
     coordinator.py --reprocess all        # ... for every done page
 
-Shape after the earlier OCR coordinator (an earlier OCR coordinator): stdlib http.server + sqlite3 and a
-few threads. No auth: page images of a public set (MoMA's free catalogues), on the LAN and the private network only.
+Shape after an earlier OCR coordinator of mine: stdlib http.server + sqlite3 and a
+few threads. No auth: page images of a public set (MoMA's free catalogues), on the private network only.
 
 Threads: HTTP (one per request), maintenance (expire leases every 30 s, rescan for rendered books every 5 min, write
 status.json every minute), post-processing (POSTPP threads, from the DB, so a restart resumes where it stopped).

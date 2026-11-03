@@ -5,10 +5,10 @@ Page 1 of every MoMA catalogue PDF is MoMA's own catalogue-record sheet, and an 
 so Calibre's record is the gold standard. Run identify.py with --skip-first 1 first, so the model never sees that sheet.
 
 Two ways to get the gold:
-  - on hub, read Calibre directly (default --lib /mnt/nas/Books; WAL-safe temp copy);
-  - anywhere else, pass --gold gold.json, written on hub by --dump-gold:
+  - on the hub, read Calibre directly (default --lib /mnt/nas/Books; WAL-safe temp copy);
+  - anywhere else, pass --gold gold.json, written on the hub by --dump-gold:
 
-    gold_moma.py --root /srv/colophon --dump-gold /srv/colophon/ident/_gold.json      # on hub
+    gold_moma.py --root /srv/colophon --dump-gold /srv/colophon/ident/_gold.json      # on the hub
     gold_moma.py --root /srv/colophon [--books 13238,13443] [--sample 20] [--gold FILE]
 
 Fields compared after normalisation: title (main title; a subtitle on either side is optional), year (4 digits),

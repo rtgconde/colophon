@@ -157,7 +157,7 @@
   getJSON('/api/stats').then(function (s) {
     $('stats').innerHTML = s.figures + ' figures from ' + s.pages + ' pages of ' + s.books +
       ' MoMA catalogues so far · try <a href="#q=a+woman+reading+a+letter">a woman reading a letter</a>, ' +
-      '<a href="#q=water+tower">water tower</a>, <a href="#q=model+of+a+building">model of a building</a>';
+      '<a href="#q=a+city+street+at+night">a city street at night</a>, <a href="#q=still+life+with+apples">still life with apples</a>';
   }).catch(function () {});
   route();
 })();

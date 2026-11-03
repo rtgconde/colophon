@@ -1,6 +1,6 @@
 """A minimal OpenAI-compatible chat client for the Meta Model API, stdlib only.
 
-Also talks to any OpenAI-compatible local endpoint (a router, LiteLLM, Ollama) for testing without a key:
+Also talks to any OpenAI-compatible local endpoint (LiteLLM, Ollama, vLLM) for testing without a key:
     Client(base_url="http://127.0.0.1:11435/v1", model="qwen3.8:27b", provider="local")
 
 Key resolution for the Meta provider: explicit arg > $META_API_KEY > the key file (default ~/.config/colophon/meta.env,

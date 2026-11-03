@@ -8,7 +8,7 @@
 Per page it posts two boxes:
   0  "photograph", score 0.9: a random box covering 10-40 % of the page (a stand-in figure; it can still land on text)
   1  "diagram",    score 0.6: the page's largest text block from text/<id>.bbox.html, scaled to pixels — only when
-     --root is given (run it on hub) and the page has a block >= 3 % of the page. The coordinator must drop it.
+     --root is given (run it on the hub) and the page has a block >= 3 % of the page. The coordinator must drop it.
 The result carries a "fake" field naming the text box, so a test can check it was dropped (the coordinator stores
 raw results verbatim and ignores unknown fields).
 

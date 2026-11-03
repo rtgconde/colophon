@@ -1,9 +1,9 @@
 # Colophon — data layout and the coordinator ↔ worker protocol
 
-Everything lives on hub under `/srv/colophon` (owner `colophon`). Workers on other hosts only ever talk HTTP to the
+Everything lives on the hub under `/srv/colophon` (owner `colophon`). Workers on other hosts only ever talk HTTP to the
 coordinator; they never mount anything.
 
-## Layout on hub
+## Layout on the hub
 
 ```
 /srv/colophon/

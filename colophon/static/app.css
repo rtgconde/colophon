@@ -1,4 +1,4 @@
-/* Colophon — search over the figures of MoMA's exhibition catalogues. Same restraint as the owner's wiki reader:
+/* Colophon — search over the figures of MoMA's exhibition catalogues. Same restraint as an earlier reader of mine:
    system sans for UI, IBM Plex Serif for titles, black/white with one accent, light/dark. No external assets. */
 @font-face { font-family: 'IBM Plex Serif'; font-style: normal; font-weight: 400; font-display: swap;
   src: url(fonts/ibm-plex-serif-latin-normal-400-51510a.woff2) format('woff2'); }

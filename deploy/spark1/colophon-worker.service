@@ -2,7 +2,7 @@
 # Install: deploy/spark1/install.sh copies this to ~/.config/systemd/user/.
 # Start:   systemctl --user enable --now colophon-worker
 [Unit]
-Description=Colophon SAM 3.1 figure-segmentation worker (coordinator on hub :8101)
+Description=Colophon SAM 3.1 figure-segmentation worker (coordinator on the hub :8101)
 After=network-online.target
 Wants=network-online.target
 

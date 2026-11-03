@@ -1,9 +1,9 @@
 # Colophon SAM 3.1 worker on spark1
 
 A native (no Docker) SAM 3.1 worker on spark1 (DGX Spark, NVIDIA GB10, aarch64, sm_121).
-It leases pages from the coordinator on hub (`http://hub:8101`, `docs/PROTOCOL.md`),
+It leases pages from the coordinator on the hub (`http://hub:8101`, `docs/PROTOCOL.md`),
 segments figures with the 8 prompts from `GET /config`, and posts one result per page.
-It runs beside ComfyUI (Docker, serving a front end) and touches none of it.
+It runs beside a ComfyUI instance and touches none of it.
 
 **State on 2026-11-02 22:31 EST: the unit is enabled and running** (`systemctl --user`, colophon has `Linger=yes`).
 
@@ -21,7 +21,7 @@ It runs beside ComfyUI (Docker, serving a front end) and touches none of it.
 
 Nothing at the top of `~`, nothing installed with sudo.
 
-**torch**: the recipe works on a DGX Spark (`~/services/toolkit/.venv`):
+**torch**: the recipe that works on a DGX Spark:
 `uv pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu130`
 → `2.13.0+cu130`, aarch64 wheels, `cuda.is_available()` true, capability (12, 1). Took two minutes; no build.
 Other packages: `sam3` (editable), `psutil` (sam3 imports it), `pycocotools`, `einops`, `safetensors`, `opencv-python-headless`.
@@ -56,7 +56,7 @@ ssh spark1 '~/services/colophon-worker/venv/bin/python ~/services/colophon-worke
 ## The weights (read this)
 
 The official checkpoints (`facebook/sam3.1` → `sam3.1_multiplex.pt`, and `facebook/sam3`) are **gated, and the
-owner's HF account `author` was not on the authorized list** on 2026-11-02 (403 `GatedRepoError` on both).
+author's account was not on the authorized list** on 2026-11-02 (403 `GatedRepoError` on both).
 So the worker loads the **Comfy-Org repack** ComfyUI already had on spark1,
 `~/models/comfyui/checkpoints/sam3.1_multiplex_fp16.safetensors` (1.7 GB, fp16), hard-linked into `~/models/sam3/`.
 

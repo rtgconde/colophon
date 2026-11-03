@@ -16,7 +16,7 @@ Environment=COLOPHON_ROOT=/srv/colophon
 ExecStart=/home/colophon/.venvs/colophon/bin/python /srv/colophon/app/coordinator.py
 Restart=on-failure
 RestartSec=5
-# modest: the page render and the rest of hub come first
+# modest: the page render and the rest of the hub comes first
 Nice=5
 
 [Install]

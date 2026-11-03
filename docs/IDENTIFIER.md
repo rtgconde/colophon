@@ -105,9 +105,9 @@ earlier import copied that sheet into Calibre, so Calibre's record is the gold. 
 `--skip-first 1` so the model never sees the sheet, then:
 
 ```bash
-# on hub (reads Calibre itself: WAL-safe temp copy of metadata.db + -wal + -shm)
+# on the hub (reads Calibre itself: WAL-safe temp copy of metadata.db + -wal + -shm)
 ~/.venvs/colophon/bin/python /srv/colophon/app/gold_moma.py --root /srv/colophon [--books …] [--sample 20]
-# anywhere else: dump the gold on hub once, copy it, pass --gold
+# anywhere else: dump the gold on the hub once, copy it, pass --gold
 ~/.venvs/colophon/bin/python /srv/colophon/app/gold_moma.py --root /srv/colophon --dump-gold /srv/colophon/ident/_gold.json
 python3 colophon/gold_moma.py --root <local root> --gold _gold.json
 ```
@@ -139,7 +139,7 @@ cost, median seconds per book). `--ident-dir` scores an earlier run's copy, `--s
 
 ## Measured results
 
-### Muse Spark 1.3, gold test on all 757 books (`--skip-first 1`, on hub, 2026-11-03)
+### Muse Spark 1.3, gold test on all 757 books (`--skip-first 1`, on the hub, 2026-11-03)
 
 The full run, four books in parallel (`deploy/hub/run-identify-all.sh`): 521 books on 11-02/03, the remaining 236
 after a pause, **$23.21** in all, **median 7.46 s per book**. Per field: title **569/757** strict, **709/757**
@@ -150,7 +150,7 @@ the scores hide is `docs/RESULTS.md` § 4. The 20-book run below is where the pr
 its numbers held at scale (title conv. 100 % → 94 %, author conv. 100 % → 85 %, year conv. 85 % → 90 %,
 publisher 95 % → 86 %).
 
-### Muse Spark 1.3, gold test on 20 books (`--skip-first 1`, on hub, 2026-11-02)
+### Muse Spark 1.3, gold test on 20 books (`--skip-first 1`, on the hub, 2026-11-02)
 
 Books 13183–13204 (20 MoMA brochures and catalogues, 2003–2005; 15 with a person as Calibre's author, 2 with an
 ISBN). "Before" = the coordinator's first run (prompt v1, no `artists` / `exhibition_dates`), rescored with the
@@ -189,7 +189,7 @@ Findings the scores hide:
 
 ### Local model, first test (`qwen3.8:27b`, 3 books)
 
-Measured 2026-11-02 on the Mac before the Meta key existed: the vision model was `qwen3.8:27b` through the local pool
+Measured 2026-11-02 on the Mac before the Meta key existed: the vision model was `qwen3.8:27b` through a local model
 router (`--provider local --base-url http://127.0.0.1:11435/v1`), prompt v1.
 
 ### Identifier, gold test on 3 books (`--skip-first 1`, so MoMA's record sheet was never shown)
@@ -242,7 +242,7 @@ the list (negative control; neighbours in this list are often related books, so 
   1910-1934*; others are OpenLibrary storing a different form of the title (*Mies van der Rohe* for *Mies in Berlin*,
   a transliterated Japanese edition, the subtitle-only *Furniture from the design collection* for *Charles Eames*).
 
-Files on hub: the gold dump `/srv/colophon/ident/_gold.json` (all 757 books, from Calibre) and the verifier run
+Files on the hub: the gold dump `/srv/colophon/ident/_gold.json` (all 757 books, from Calibre) and the verifier run
 `/srv/colophon/ident/_verifier_on_gold.json`; the OpenLibrary cache in `/srv/colophon/cache/openlibrary/`.
 
 ### Not yet measured

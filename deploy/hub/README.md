@@ -1,10 +1,10 @@
-# hub — the Colophon coordinator
+# The hub: the Colophon coordinator
 
 The coordinator hands rendered book pages to the SAM 3.1 workers and stores what they send back. It then post-processes
 each result into figure crops. The contract it serves is `docs/PROTOCOL.md`. The code is `colophon/coordinator.py`,
 `colophon/postprocess.py` and `colophon/fake_worker.py`.
 
-- **Address:** `http://hub:8101` (private network or LAN). Bound to `0.0.0.0`.
+- **Address:** `http://hub:8101` (private network). Bound to `0.0.0.0`.
 - **Unit:** `colophon-coordinator.service`, a system unit that runs as `colophon` from `/srv/colophon`, with the venv
   `~/.venvs/colophon` (Pillow), `Nice=5`, and logs in the journal.
 - **State:** `/srv/colophon/state.db` (SQLite, WAL). `/srv/colophon/status.json` is rewritten every minute.
@@ -88,7 +88,7 @@ to `todo` at start-up. Workers see connection errors for about a second.
 
 ## Resetting
 
-Run these on hub. They are safe while the service runs.
+Run these on the hub. They are safe while the service runs.
 
 ```bash
 cd /srv/colophon
@@ -106,7 +106,7 @@ crops, for example after a rule change.
 ## Test worker
 
 ```bash
-# on hub (with --root it also posts a box over the page's largest text block, which must be dropped)
+# on the hub (with --root it also posts a box over the page's largest text block, which must be dropped)
 ~/.venvs/colophon/bin/python /srv/colophon/app/fake_worker.py --url http://127.0.0.1:8101 --name fake-hub \
     --seconds 120 --max-pages 300 --root /srv/colophon --abandon 3 --fail-rate 0.05
 # afterwards, clear its results
@@ -117,11 +117,11 @@ Name test workers `fake-*` so that the reset finds them.
 
 ## Firewall (ufw)
 
-ufw on hub denies incoming traffic by default. Two rules were added on 2026-11-03:
+ufw on the hub denies incoming traffic by default. Two rules were added on 2026-11-03:
 
 ```
 sudo ufw allow from <lan-subnet> to any port 8101 proto tcp comment "Colophon coordinator (LAN)"
-sudo ufw allow from <vpn-subnet>  to any port 8101 proto tcp comment "Colophon coordinator (private network)"
+sudo ufw allow from <vpn-subnet> to any port 8101 proto tcp comment "Colophon coordinator (private network)"
 ```
 
 Both paths were checked from the Mac. To remove the rules, run `sudo ufw status numbered` and then

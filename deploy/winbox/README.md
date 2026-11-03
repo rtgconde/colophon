@@ -49,13 +49,12 @@ in seconds. The zip has been deleted from winbox, so to reinstall, make it again
 
 ## Weights: why the ComfyUI fp16 file, not Hugging Face
 
-`facebook/sam3.1` (`sam3.1_multiplex.pt`) and `facebook/sam3` are **gated**. The sealed HF token authenticates, but this
-account is **not on either access list** (`GatedRepoError: ... you are not in the authorized list`). Fixing that needs the
-owner: log in at <https://huggingface.co/facebook/sam3.1>, request access and accept Meta's terms.
+`facebook/sam3.1` (`sam3.1_multiplex.pt`) and `facebook/sam3` are **gated**, and the author's account was **not on either
+access list** on 2026-11-02 (`GatedRepoError: ... you are not in the authorized list`). Fixing that means logging in at
+<https://huggingface.co/facebook/sam3.1>, requesting access and accepting Meta's terms.
 
 What we use instead is `sam3.1_multiplex_fp16.safetensors`, the fp16 SAM 3.1 checkpoint that already sits in all three
-ComfyUI libraries (spark1, spark2, mlbox; on the estate since 2026-10-06). It was copied from spark1 and the sha256 was
-verified. Its `detector.*` half is loaded into the official image model, which is exactly what the official sam3 loader
+ComfyUI libraries here (the same file on every GPU host). It was copied from spark1 and the sha256 was verified. Its `detector.*` half is loaded into the official image model, which is exactly what the official sam3 loader
 does with a 3.1 checkpoint (and what `worker_sam.py` on spark1 does):
 
 ```python
@@ -151,7 +150,7 @@ ssh winbox 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\c
   `Win32_Process.Create` (`Invoke-CimMethod`) child was still running. The start script therefore uses CIM.
 - **Never pipe a secret into `powershell -Command -`.** PowerShell reads stdin *as the script*, so
   `[Console]::In.ReadLine()` gets nothing, the secret line is **executed as a command**, and it comes back verbatim in
-  the "is not recognized as a cmdlet" error. This happened once with the HF token (see Open items). What works:
+  the "is not recognized as a cmdlet" error. What works:
   `get-secret hf-token | ssh winbox "C:\...\python.exe C:\...\script.py"`, with the script reading
   `sys.stdin.readline()` and passing `token=` to `hf_hub_download`. PowerShell never parses the line, and nothing is
   written to disk or put on a command line.
@@ -164,14 +163,11 @@ ssh winbox 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\c
 - sam3 imports `triton` (from `sam3/model/edt.py`, through `model_builder`) and `psutil` at import time, even for the
   image model. On Windows that means `triton-windows` (only the import is needed; the kernel runs only in video
   tracking) and `psutil`.
-- The GPU's ~2.4 GB / ~12 % "use" at idle is the desktop (dwm, launchers, a launcher, utilities…), not a compute
-  job. Nothing was stopped.
+- The GPU's ~2.4 GB / ~12 % "use" at idle is the desktop (dwm, launchers, utilities), not a compute job. Nothing was
+  stopped.
 
 ## Open items
 
-- **Rotate the Hugging Face token** (`hf-token` in `the secret store`). It was echoed once into this setup session's
-  transcript on the Mac by the stdin trap above. It did not reach disk on winbox: the PowerShell event log (4104/4100)
-  and PSReadLine history were checked and contain no `hf_…` string.
 - Owner: request access to `facebook/sam3.1` on Hugging Face if the official `.pt` checkpoint is wanted. It is not
   needed for this worker.
 - Run the worker against a book with paintings, maps or drawings, to see the other prompts fire.

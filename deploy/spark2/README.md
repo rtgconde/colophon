@@ -5,7 +5,7 @@ it covers the weights, how the worker runs SAM, and the traps. This file records
 what was different there.
 
 **State on 2026-11-02 22:51 EST: the unit is enabled and running** (`systemctl --user`, `--name spark2`; colophon
-already had `Linger=yes` on spark2, so linger was not changed). It leases pages from the coordinator on hub
+already had `Linger=yes` on spark2, so linger was not changed). It leases pages from the coordinator on the hub
 (`http://hub:8101`) next to spark1.
 
 ## What is where (spark2)
@@ -80,6 +80,6 @@ spark2 under the service: GPU 74–86 % utilisation, 76 °C, ~53–64 W, 2.47–
 
 ## Not verified
 
-- Behaviour while ComfyUI or a front end renders on spark2's GPU. Both were idle during the run, and `the GPU gate` does
-  not know about this worker. A render will share the GPU with it, and both will slow down.
+- Behaviour while ComfyUI renders on spark2's GPU. It was idle during the run, and nothing stops a render from
+  sharing the GPU with the worker; both would slow down.
 - The rate over a long run. Only 3.5 minutes were measured.

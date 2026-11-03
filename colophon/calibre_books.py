@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build books.json from the Calibre library: every book carrying an identifier of the given type that has a PDF.
 
-Runs on hub (the library is the CIFS mount). Copies metadata.db + WAL + SHM to a temp dir first — the library is in
-WAL mode and reading the main file alone over CIFS returns stale rows.
+Runs on the hub (the library is a network mount). Copies metadata.db + WAL + SHM to a temp dir first — the library is in
+WAL mode and reading the main file alone over the network returns stale rows.
 
     calibre_books.py --lib /mnt/nas/Books --ident moma --out /srv/colophon/books.json
 """

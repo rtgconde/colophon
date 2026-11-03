@@ -15,7 +15,7 @@ MODELS="$HOME/models/sam3"
 SCRATCH="$HOME/scratch/2026-11-02-colophon"
 UV="${UV:-$HOME/.local/bin/uv}"
 
-# The torch recipe works on a DGX Spark (services/toolkit/.venv):
+# The torch recipe that works on a DGX Spark:
 TORCH_INDEX="https://download.pytorch.org/whl/cu130"
 TORCH_PKGS=(torch==2.13.0 torchvision==0.28.0)          # -> 2.13.0+cu130 / 0.28.0+cu130, aarch64
 SAM3_REPO="https://github.com/facebookresearch/sam3.git"
@@ -42,7 +42,7 @@ git -C "$SRC" checkout -q "$SAM3_REV"
   psutil pycocotools einops safetensors opencv-python-headless
 
 # Weights. The official facebook/sam3.1 checkpoint is gated and the owner's HF account
-# (author) was not on the authorized list on 2026-11-02, so the worker loads the
+# was not on the authorized list on 2026-11-02, so the worker loads the
 # Comfy-Org repack ComfyUI already keeps on this host (same detector.* / tracker.* keys,
 # fp16). A hard link, so ComfyUI's file is untouched and a later ComfyUI library
 # reshuffle cannot break the worker.
@@ -52,7 +52,7 @@ fi
 # Once access is granted, fetch the official one (token on stdin only, never as an arg):
 #   python3 get-secret hf-token | ssh spark1 'T=$(cat); HF_TOKEN=$T \
 #     ~/services/colophon-worker/venv/bin/python -c "from huggingface_hub import hf_hub_download as d; \
-#     [d(\"facebook/sam3.1\", f, local_dir=\"/home/colophon/models/sam3/sam3.1\") for f in (\"config.json\",\"sam3.1_multiplex.pt\")]"'
+#     [d(\"facebook/sam3.1\", f, local_dir=\"$HOME/models/sam3/sam3.1\") for f in (\"config.json\",\"sam3.1_multiplex.pt\")]"'
 # then set COLOPHON_SAM_CKPT=~/models/sam3/sam3.1/sam3.1_multiplex.pt in the unit.
 
 ls -l "$MODELS"
