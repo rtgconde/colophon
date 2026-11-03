@@ -51,6 +51,7 @@ def search2(page):   # the second query, then the Works tab, slowly
     wheel(page, 960, 600, 50, 44, 150)                                      # Silence, The Bathers, Rayograph...
     page.wait_for_timeout(800)
 jobs = {"card_open": (5.5, term("card_open.html"), False), "search1": (22, search1, True), "search2": (32, search2, True),
-        "ident": (48.5, term("ident.html"), False), "stats": (9, term("stats.html"), False), "card_close": (6, term("card_close.html"), False)}
+        "ident": (38.5, term("ident.html"), False), "stats": (9, term("stats.html"), False), "card_close": (6, term("card_close.html"), False),
+        "wall": (8.5, term("wall.html"), False), "jobs": (13, term("jobs.html"), False), "flow": (11, term("flow.html"), False)}
 for n in (sys.argv[1:] or list(jobs)):
     sec, fn, cur = jobs[n]; rec(n, sec, fn, cursor=cur)

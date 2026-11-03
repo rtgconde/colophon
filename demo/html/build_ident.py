@@ -4,7 +4,7 @@
    20–31 the gold scores on all 757 catalogues;
    31–44 Focus: Elizabeth Murray: the record from the pages, then MoMA's own sheet with its 1987 against the pages' 2005."""
 import os, json
-HERE = os.path.dirname(os.path.abspath(__file__)); P = os.path.join(HERE, "..", "ident")   # the two books' pages and crops (not in git: pages/<id>/ on the hub)
+HERE = os.path.dirname(os.path.abspath(__file__)); P = os.path.join(HERE, "..", "ident")
 def img(n): return "file://" + os.path.join(P, n)
 HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Plex;src:url(ibm-plex-serif-latin-normal-600-182f05.woff2);font-weight:600}

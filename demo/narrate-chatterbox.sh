@@ -1,24 +1,32 @@
 #!/bin/bash
-# Chatterbox narration: one CLI run per segment (the model reloads each time, ~15 s), pieces joined in order.
+# The voice-over: Chatterbox (mlx-community/Chatterbox-TTS-fp16 through mlx-audio) cloned from ref_kokoro.wav, a synthetic Kokoro sample.
+# One CLI run per piece (the model reloads each time), pieces joined with a 0.35 s breath, WAVs in tts/, lengths in tts/durations.json.
 cd "$(dirname "$0")"; V=${TTS_PYTHON:-python3}; mkdir -p pieces
-python3 - <<'PY' > /tmp/cb_segments.tsv
+python3 - <<'PY' > /tmp/cb_regen.tsv
 import json
-for k, v in json.load(open("segments_cb.json")).items(): print(k + "\t" + v.replace("\n", " "))
+for k, parts in json.load(open("narration-pieces.json")).items():
+    for i, t in enumerate(parts): print(f"{k}\t{i}\t{t}")
 PY
-while IFS=$'\t' read -r name text; do
-  rm -f pieces/${name}_*.wav
-  $V -m mlx_audio.tts.generate --model mlx-community/Chatterbox-TTS-fp16 --ref_audio ref_kokoro.wav --text "$text" --output_path pieces --file_prefix "$name" > "pieces/$name.log" 2>&1
-  n=$(ls pieces/${name}_*.wav 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$n" = "1" ]; then cp pieces/${name}_000.wav "$name.wav"; else
-    ls pieces/${name}_*.wav | sort | sed "s/^/file '/; s/$/'/" > pieces/$name.txt
-    ffmpeg -y -v error -f concat -safe 0 -i pieces/$name.txt -c copy "$name.wav"; fi
-  d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$name.wav")
-  echo "$name pieces=$n dur=$d"
-done < /tmp/cb_segments.tsv
+while IFS=$'\t' read -r name i text; do
+  rm -f pieces/${name}_p${i}_*.wav
+  $V -m mlx_audio.tts.generate --model mlx-community/Chatterbox-TTS-fp16 --ref_audio ref_kokoro.wav --text "$text" --output_path pieces --file_prefix "${name}_p${i}" > "pieces/${name}_p${i}.log" 2>&1
+  echo "$name piece $i: $(ffprobe -v error -show_entries format=duration -of csv=p=0 pieces/${name}_p${i}_000.wav)"
+done < /tmp/cb_regen.tsv
 python3 - <<'PY'
-import json, subprocess
-d = {}; t = 0
-for k in json.load(open("segments_cb.json")):
-    s = float(subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",k+".wav"],capture_output=True,text=True).stdout); d[k]=round(s,2); t+=s
-json.dump(d, open("durations.json","w"), indent=1); print("total %.1f s" % t)
+import json, subprocess, os
+os.makedirs("tts", exist_ok=True)
+pieces = json.load(open("narration-pieces.json")); d = (json.load(open("tts/durations.json")) if os.path.exists("tts/durations.json") else {}); pd = {}
+for k, parts in pieces.items():
+    files = [f"pieces/{k}_p{i}_000.wav" for i in range(len(parts))]
+    if len(files) == 1: subprocess.run(["cp", files[0], "tts/" + k + ".wav"], check=True)
+    else:
+        # a 0.35 s breath between pieces
+        inputs = []; filt = []
+        for i, f in enumerate(files): inputs += ["-i", f]
+        n = len(files); chain = "".join(f"[{i}:a]apad=pad_dur=0.35[a{i}];" for i in range(n)) + "".join(f"[a{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[out]"
+        subprocess.run(["ffmpeg","-y","-v","error"] + inputs + ["-filter_complex", chain, "-map", "[out]", k + ".wav"], check=True)
+    pd[k] = [round(float(subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",f],capture_output=True,text=True).stdout),2) for f in files]
+    d[k] = round(float(subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0","tts/"+k+".wav"],capture_output=True,text=True).stdout),2)
+json.dump(d, open("tts/durations.json","w"), indent=1); json.dump(pd, open("tts/piece-durations.json","w"), indent=1)
+print(d); print("pieces:", pd); print("total %.1f s" % sum(d.values()))
 PY
