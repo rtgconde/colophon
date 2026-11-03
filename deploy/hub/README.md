@@ -157,16 +157,17 @@ here are byte-identical to the deployed ones.
 
 | Script | What it does |
 |---|---|
-| `read-loop.sh` | runs `reader.py` (8 threads) over every page that has figures and no read yet, then again every 3 min as SAM adds pages. Exits when `read/STOP` exists. `BUDGET` is a **total** in dollars: the reader sums the `cost_usd` of every file under `read/` and `ident/` before each call and stops at the limit. |
+| `read-loop.sh` | runs `reader.py` (8 threads) over every page that has figures and no read yet, then again every 3 min as SAM adds pages. Exits when `read/STOP` exists. `BUDGET` is a **total for the reads** in dollars: the reader sums the `cost_usd` of every file under `read/` (not `ident/`: the identifier's $23.21 is outside it) at start and after each call, and stops at the limit. |
 | `restart-read-loop.sh` | the only safe way to start or restart the loop: stops the old loop and reader, removes the STOP file, starts a new loop with `BUDGET`. **Run it as a script file, never inline over ssh**: `pkill -f` would match the ssh command line that carries the pattern, and kill the ssh. |
 | `stop-api.sh` | the pause button: writes `read/STOP`, kills the loop, the reader and the identifier. SAM, the indexer and the search page keep running. |
 | `run-identify-all.sh` | `identify.py` over every book (`--skip-first 1`, so MoMA's record sheet is never shown; 4 threads), then `gold_moma.py`; writes `FINISHED` to `logs/gold-all.log`. It does **not** look at `read/STOP`: the identifier was resumed on its own while the reads stayed paused. |
 | `spend-guard.sh` | independent of the reader's own check: every 5 min it sums every `cost_usd` under `read/` and `ident/` into `logs/spend-total.txt` and, at `LIMIT` (98), runs the same stop as `stop-api.sh`. The glob is `ident/[0-9]*.json` so that `_gold_summary.json`, which repeats the identifier's total, is not counted twice. |
+| `restart-spend-guard.sh` | the guard reads `LIMIT` once, at start, so a new limit needs a restart: this stops the running guard and starts it again with `LIMIT`. Same rule as `restart-read-loop.sh`: run it as a script file, never inline over ssh. Added when the $150 of free credits arrived (2026-11-03): `LIMIT=178` (reads + identifier) and `BUDGET=150` (reads only; with the identifier's $23.21 that is $173 in the files, about $177 on Meta's dashboard, which counts 2 % more than the files, so about $136 of the $150 credits are used and $14 are left as margin). Meta counted $40.28 before the credits, so the card is next touched past $190.28 there; the credits are drawn first. |
 
 ```bash
 cd /srv/colophon
-setsid nohup bash app/spend-guard.sh > /dev/null 2>&1 < /dev/null &      # once, first
-BUDGET=75 bash app/restart-read-loop.sh                                  # reads, capped at $75 total
+LIMIT=178 bash app/restart-spend-guard.sh                                # the guard first (a new LIMIT needs this)
+BUDGET=150 bash app/restart-read-loop.sh                                 # reads, capped at $150 of reads
 setsid nohup bash app/run-identify-all.sh > /dev/null 2>&1 < /dev/null & # all 757 books, then the gold test
 bash app/stop-api.sh                                                     # pause everything that spends
 
