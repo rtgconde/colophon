@@ -151,8 +151,11 @@ def main():
 
     def run(job):
         book, page, figs, out = job
+        with lock:                       # checked per call, so the cap holds within a run too
+            if a.budget_usd and spent >= a.budget_usd:
+                return {"book": book, "page": page, "ok": False, "skipped": True, "error": "budget reached"}
         res = read_page(client, a.root, book, page, figs, a.long_side, dry_dir)
-        if not a.dry_run:
+        if not a.dry_run and not res.get("skipped"):
             os.makedirs(os.path.dirname(out), exist_ok=True)
             with open(out, "w") as f:
                 json.dump(res, f, ensure_ascii=False, indent=1)
@@ -171,9 +174,11 @@ def main():
             with lock:
                 if res.get("ok"):
                     n_ok += 1
-                elif not res.get("dry_run"):
+                elif not res.get("dry_run") and not res.get("skipped"):
                     n_err += 1
                 spent += res.get("cost_usd") or 0
+            if res.get("skipped"):
+                continue
             tag = "dry" if res.get("dry_run") else ("ok" if res.get("ok") else f"ERR {res.get('error','')[:80]}")
             print(f"[{i}/{len(futs)}] {res['book']}/{res['page']:04d} {tag} {res.get('elapsed_s','')}s "
                   f"${res.get('cost_usd') or 0:.4f} | spent ${spent:.3f} {time.time()-t0:.0f}s", flush=True)
