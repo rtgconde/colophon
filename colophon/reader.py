@@ -123,7 +123,11 @@ def main():
             continue
         out = f"{a.root}/read/{book}/{page:04d}.json"
         if os.path.exists(out) and not a.force:
-            continue
+            try:
+                if json.load(open(out)).get("ok"):
+                    continue          # a failed read (billing, network) is retried on the next run
+            except (OSError, ValueError):
+                pass
         figs = json.load(open(fpath))
         if not figs:
             continue
