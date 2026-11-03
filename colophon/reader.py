@@ -135,7 +135,15 @@ def main():
     if a.limit:
         jobs = jobs[:a.limit]
     print(f"{len(jobs)} pages to read, provider={a.provider} model={client.model if client else '-'}", flush=True)
+    # the budget is a TOTAL across runs: count what earlier runs already spent
     spent = 0.0
+    for prev in glob.glob(f"{a.root}/read/*/*.json"):
+        try:
+            spent += json.load(open(prev)).get("cost_usd") or 0
+        except (OSError, ValueError):
+            pass
+    if spent:
+        print(f"already spent ${spent:.3f} in earlier runs", flush=True)
     lock = threading.Lock()
     n_ok = n_err = 0
     t0 = time.time()

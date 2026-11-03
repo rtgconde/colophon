@@ -24,6 +24,7 @@ exactly what the official loader does with a 3.1 checkpoint (it keeps the
 from __future__ import annotations
 
 import argparse
+import platform
 import io
 import json
 import logging
@@ -248,6 +249,9 @@ def run_loop(args) -> int:
             _sleep(30)
             continue
         for it in items:
+            if args.stop_file and os.path.exists(args.stop_file):
+                log.info("stop file %s present: exiting", args.stop_file)
+                _stop.set()
             if _stop.is_set():
                 # Unprocessed leases simply expire and go back to the queue (PROTOCOL.md).
                 break
@@ -329,7 +333,9 @@ def run_local(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--coordinator", help="e.g. http://hub:8101")
-    ap.add_argument("--name", default=os.uname().nodename.split(".")[0])
+    ap.add_argument("--name", default=platform.node().split(".")[0])
+    ap.add_argument("--stop-file", default=os.path.join(os.getcwd(), "worker.stop"),
+                    help="exit cleanly when this file appears (Windows has no SIGTERM for a detached process)")
     ap.add_argument("--batch", type=int, default=4, help="pages per lease")
     ap.add_argument("--local", nargs="+", metavar="JPG", help="run on local files instead")
     ap.add_argument("--out", help="--local: write JSON here (with masks) instead of stdout")
