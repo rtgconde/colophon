@@ -23,7 +23,7 @@ import argparse, glob, json, os, random, re, shutil, sqlite3, sys, tempfile, uni
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from verify import isbn_norm, to_isbn13  # noqa: E402
 
-FIELDS = ["title", "year", "publisher", "author", "isbn"]
+FIELDS = ["title", "title_conv", "year", "year_conv", "publisher", "author", "author_conv", "isbn"]
 
 
 # ---------- gold from Calibre ----------
@@ -121,33 +121,88 @@ def isbn_set(lst):
 
 # ---------- comparison ----------
 
+def _words(s):
+    return f" {norm_title(s)} "
+
+
+def title_conv(gold, rec):
+    """Convention-aware title: MoMA's record sheet composes the title from the series line and the artist
+    ("Projects 82: Mark Dion: rescue archaeology, …"), while the title page carries only "Rescue archaeology". Match when
+    the gold equals [series [number]: ][artists: ]title[: subtitle] after normalisation, or when the read title is
+    contained in the gold (word-bounded, ≥ 2 significant words), or the gold in the read title with a leading series
+    line stripped. Returns the convention name or ""."""
+    t, sub = rec.get("title", "") or "", rec.get("subtitle", "") or ""
+    series = " ".join(x for x in (rec.get("series", ""), rec.get("series_number", "")) if x).strip()
+    if series and rec.get("series_number") and rec["series_number"] in (rec.get("series") or ""):
+        series = rec["series"]
+    artists = ", ".join(rec.get("artists") or [])
+    g = norm_title(gold)
+    for label, parts in (("series+title", [series, t, sub]), ("series+title", [series, t]),
+                         ("series+artist+title", [series, artists, t, sub]), ("series+artist+title", [series, artists, t]),
+                         ("artist+title", [artists, t, sub]), ("artist+title", [artists, t]),
+                         ("series+title+artists", [series, t, artists])):
+        if all(parts) and norm_title(": ".join(parts)) == g:
+            return label
+    for cand in (f"{t}: {sub}" if sub else "", t):
+        if cand and len(norm_title(cand).split()) >= 2 and _words(cand) in _words(gold):
+            return "read_in_gold"
+    rt = norm_title(f"{t}: {sub}" if sub else t)
+    for pre in (series, rec.get("series", "")):
+        pn = norm_title(pre) if pre else ""
+        if pn and rt.startswith(pn + " ") and rt[len(pn) + 1:] in (g, norm_title(re.split(r"[:;]", gold, maxsplit=1)[0])):
+            return "series_in_read"
+    if len(g.split()) >= 2 and f" {g} " in f" {rt} ":
+        return "gold_in_read"
+    return ""
+
+
+def exhibition_years(rec):
+    return set(re.findall(r"\b(1[89]\d\d|20\d\d)\b", rec.get("exhibition_dates", "") or ""))
+
+
 def compare(gold, rec):
     res = {}
-    # title
-    res["title"] = ("ok" if title_eq(gold["title"], rec.get("title", ""), rec.get("subtitle", "")) else "wrong",
-                    gold["title"], " : ".join(x for x in (rec.get("title", ""), rec.get("subtitle", "")) if x))
-    # year
+    read_title = " : ".join(x for x in (rec.get("title", ""), rec.get("subtitle", "")) if x)
+    # title: strict, then cataloguing-convention aware
+    strict = title_eq(gold["title"], rec.get("title", ""), rec.get("subtitle", ""))
+    res["title"] = ("ok" if strict else "wrong", gold["title"], read_title)
+    conv = "strict" if strict else title_conv(gold["title"], rec)
+    series = " ".join(x for x in (rec.get("series", ""), rec.get("series_number", "")) if x)
+    res["title_conv"] = (f"ok_{conv}" if conv else "wrong", gold["title"],
+                         f"[{series}] {read_title}" if series else read_title)
+    # year: publication year strict; convention-aware also accepts a year of the exhibition dates
     gy, ry = norm_year(gold["year"]), norm_year(rec.get("year", ""))
     res["year"] = (_cmp(gy, ry, gy == ry), gy, ry)
+    ey = exhibition_years(rec)
+    if res["year"][0] in ("ok", "both_empty", "extra"):
+        res["year_conv"] = res["year"]
+    elif gy and gy in ey:
+        res["year_conv"] = ("ok_exhibition_year", gy, f"{ry} (exhibition {rec.get('exhibition_dates', '')})")
+    else:
+        res["year_conv"] = (res["year"][0], gy, f"{ry} (exhibition {rec.get('exhibition_dates', '')})" if ey else ry)
     # publisher
     gp, rp = norm_publisher(gold["publisher"]), norm_publisher(rec.get("publisher", ""))
     res["publisher"] = (_cmp(gp, rp, gp == rp), gold["publisher"], rec.get("publisher", ""))
-    # first author (gold) vs any author/editor the model read
+    # author: strict = Calibre's first author is the first person read (authors, then editors);
+    # convention-aware = Calibre's first author is among authors ∪ artists ∪ editors (MoMA files the ARTIST as author
+    # for its brochures; the title page credits the essayist)
     g0 = gold["authors"][0] if gold["authors"] else ""
+    buckets = [(k, rec.get(k) or []) for k in ("authors", "artists", "editors")]
     read_people = (rec.get("authors") or []) + (rec.get("editors") or [])
+    shown = {k: v for k, v in buckets if v}
     if MOMA_RE.search(fold(g0)):
         # Calibre carries MoMA as the author when the record sheet names no person: a corporate placeholder, not scored
-        res["author"] = ("gold_corporate", gold["authors"][:1], read_people[:3])
-        gi, ri = isbn_set(gold["isbns"]), isbn_set(rec.get("isbns"))
-        res["isbn"] = (_cmp(gi, ri, bool(gi & ri)), sorted(gi), sorted(ri))
-        return res
-    ga = author_key(g0) if g0.lower() != "unknown" else ""
-    rk = [author_key(x) for x in read_people]
-    first_ok = bool(ga) and bool(rk) and rk[0] == ga
-    any_ok = bool(ga) and ga in rk
-    res["author"] = (_cmp(ga, rk[0] if rk else "", first_ok), gold["authors"][:1], read_people[:3])
-    if res["author"][0] == "wrong" and any_ok:
-        res["author"] = ("ok_not_first",) + res["author"][1:]
+        res["author"] = res["author_conv"] = ("gold_corporate", gold["authors"][:1], shown)
+    else:
+        ga = author_key(g0) if g0.lower() != "unknown" else ""
+        rk = [author_key(x) for x in read_people]
+        res["author"] = (_cmp(ga, rk[0] if rk else "", bool(ga) and bool(rk) and rk[0] == ga), gold["authors"][:1],
+                         read_people[:3])
+        gt = sorted(fold(g0).split())          # same name in the other order ("Mingwei Lee" / "Lee Mingwei")
+        hit = next((k for k, v in buckets
+                    if ga and (ga in [author_key(x) for x in v] or gt in [sorted(fold(x).split()) for x in v])), "")
+        anyone = any(v for _, v in buckets)
+        res["author_conv"] = (f"ok_{hit}" if hit else _cmp(ga, "x" if anyone else "", False), gold["authors"][:1], shown)
     # isbn
     gi, ri = isbn_set(gold["isbns"]), isbn_set(rec.get("isbns"))
     res["isbn"] = (_cmp(gi, ri, bool(gi & ri)), sorted(gi), sorted(ri))
@@ -170,6 +225,8 @@ def main():
     ap.add_argument("--lib", default="/mnt/nas/Books")
     ap.add_argument("--gold", help="gold JSON written by --dump-gold (else read Calibre at --lib)")
     ap.add_argument("--dump-gold", metavar="OUT", help="write gold for every book in books.json (or --books) and exit")
+    ap.add_argument("--ident-dir", help="score these outputs instead of <root>/ident (e.g. an earlier run's copy)")
+    ap.add_argument("--summary", help="summary path (default <root>/ident/_gold_summary.json)")
     ap.add_argument("--books", default="")
     ap.add_argument("--sample", type=int, default=0, help="compare a random sample of N identified books")
     ap.add_argument("--seed", type=int, default=1)
@@ -184,7 +241,7 @@ def main():
         return
 
     idents = {}
-    for p in glob.glob(f"{a.root}/ident/*.json"):
+    for p in glob.glob(f"{a.ident_dir or a.root + '/ident'}/*.json"):
         b = os.path.basename(p)[:-5]
         if b.isdigit():
             idents[b] = json.load(open(p))
@@ -218,30 +275,36 @@ def main():
     acc = {}
     for f in FIELDS:
         t = tally[f]
-        scored = t.get("ok", 0) + t.get("ok_not_first", 0) + t.get("wrong", 0) + t.get("missed", 0)
-        right = t.get("ok", 0) + (t.get("ok_not_first", 0) if f == "author" else 0)
+        right = sum(v for k, v in t.items() if k.startswith("ok"))
+        scored = right + t.get("wrong", 0) + t.get("missed", 0)
         acc[f] = {"right": right, "scored": scored, "accuracy": round(right / scored, 3) if scored else None, **t}
 
     print(f"\nGold test over {len(rows)} books (skip_first={sorted(x for x in skipped_first if x is not None)})")
-    print(f"{'field':10} {'right/scored':>13} {'acc':>6}  detail")
+    print(f"{'field':12} {'right/scored':>13} {'acc':>6}  detail")
     for f in FIELDS:
         x = acc[f]
         det = " ".join(f"{k}={v}" for k, v in x.items() if k not in ("right", "scored", "accuracy"))
         a_ = f"{x['accuracy']:.0%}" if x["accuracy"] is not None else "-"
-        print(f"{f:10} {x['right']:>6}/{x['scored']:<6} {a_:>6}  {det}")
+        print(f"{f:12} {x['right']:>6}/{x['scored']:<6} {a_:>6}  {det}")
     print("\nMismatches:")
     for r in rows:
-        bad = {f: v for f, v in r["fields"].items() if v["result"] in ("wrong", "missed", "ok_not_first", "extra",
-                                                                         "gold_corporate")}
+        bad = {f: v for f, v in r["fields"].items()
+               if v["result"] not in ("ok", "both_empty", "ok_strict") and not (f.endswith("_conv") and v["result"] == r["fields"][f[:-5]]["result"])}
         for f, v in bad.items():
-            print(f"  {r['id']:>6} {f:9} {v['result']:12} gold={v['gold']!r}  read={v['read']!r}")
+            print(f"  {r['id']:>6} {f:11} {v['result']:22} gold={v['gold']!r}  read={v['read']!r}")
     summary = {"books": len(rows), "accuracy": acc, "rows": rows,
                "skip_first": sorted(x for x in skipped_first if x is not None),
                "verification": _count(r["status"] for r in rows)}
-    os.makedirs(f"{a.root}/ident", exist_ok=True)
-    with open(f"{a.root}/ident/_gold_summary.json", "w") as f:
+    out = a.summary or f"{a.root}/ident/_gold_summary.json"
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    summary["cost_usd"] = round(sum(idents[str(r["id"])].get("cost_usd") or 0 for r in rows), 4)
+    secs = sorted(idents[str(r["id"])].get("elapsed_s") or 0 for r in rows)
+    summary["median_s"] = secs[len(secs) // 2] if len(secs) % 2 else round((secs[len(secs) // 2 - 1] + secs[len(secs) // 2]) / 2, 2)
+    summary["models"] = sorted({idents[str(r["id"])].get("model") or "" for r in rows})
+    with open(out, "w") as f:
         json.dump(summary, f, ensure_ascii=False, indent=1)
-    print(f"\nverification: {summary['verification']}\nsummary -> {a.root}/ident/_gold_summary.json")
+    print(f"\nverification: {summary['verification']}  cost ${summary['cost_usd']}  median {summary['median_s']} s/book"
+          f"  models {summary['models']}\nsummary -> {out}")
 
 
 def _count(it):

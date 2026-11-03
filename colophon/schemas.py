@@ -37,7 +37,8 @@ READ_PAGE = {
 IDENTIFY_BOOK = {
     "type": "object", "additionalProperties": False,
     "required": ["title", "subtitle", "authors", "editors", "publisher", "place", "year", "edition", "isbns",
-                 "series", "series_number", "language", "printing_note", "evidence", "confidence", "notes"],
+                 "series", "series_number", "language", "printing_note", "evidence", "confidence", "notes",
+                 "artists", "exhibition_dates"],
     "properties": {
         "title": {"type": "string"}, "subtitle": {"type": "string"},
         "authors": {"type": "array", "items": {"type": "string"}},
@@ -55,5 +56,9 @@ IDENTIFY_BOOK = {
                                                                          "description": "1-based index of the image the field was read from"}}}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
         "notes": {"type": "string"},
+        "artists": {"type": "array", "items": {"type": "string"},
+                    "description": "the artist(s) the exhibition is about, as named on the cover or title page"},
+        "exhibition_dates": {"type": "string",
+                             "description": "the exhibition's dates as printed (e.g. 'March 5 - May 19, 2003'), or empty"},
     },
 }

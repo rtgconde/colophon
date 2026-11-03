@@ -22,11 +22,17 @@ Three files in `colophon/`:
 2. **Prompt.** A `developer` message tells the model what a cataloguer reads where: title and subtitle from the
    **title page** (cover and spine are secondary); authors vs editors by the printed role ("by", "edited by",
    "organized by"); publisher, place and year from the title-page imprint and the **verso** (copyright page); ISBNs
-   from the verso or back cover, ignoring those of advertised books or a set; the **colophon** line verbatim; series
-   only when printed as a series. **Nothing may be guessed or recalled**: a field not printed on the pages is empty.
+   from the verso or back cover, ignoring those of advertised books or a set; the **colophon** line verbatim. A
+   **series line** on the cover or title page (*Projects 82*, *Artist's Choice*, *Focus*) is the series and number,
+   not part of the title. The **artists** the exhibition is about go in `artists` (authors only when credited with
+   the text). **Exhibition dates** as printed go in `exhibition_dates`; `year` stays the publication year. When a
+   scan bundles **two publications**, catalogue the front one and name the other in notes. **Nothing may be guessed
+   or recalled**: a field not printed on the pages is empty.
    Each image is preceded by a text part `Image i (page p):`, so `evidence[].image` maps back to a page
    (`identify.py` adds `evidence[].page`).
-3. **Output.** Strict JSON schema `IDENTIFY_BOOK` (`colophon/schemas.py`), unchanged.
+3. **Output.** Strict JSON schema `IDENTIFY_BOOK` (`colophon/schemas.py`), with two fields added 2026-11-02 for the
+   gold conventions: `artists` (the artist(s) the exhibition is about, as named on the cover or title page) and
+   `exhibition_dates` (as printed, or empty), both required as strict mode demands.
 4. **Verification** (`verify.verify(record, root)`), see below.
 5. **Write** `ident/<id>.json` atomically:
 
@@ -106,24 +112,74 @@ earlier import copied that sheet into Calibre, so Calibre's record is the gold. 
 python3 colophon/gold_moma.py --root <local root> --gold _gold.json
 ```
 
-Per field, after normalisation:
+Per field, after normalisation, each reported **strict** and **convention-aware** (`*_conv`). The conventions are
+MoMA's cataloguing habits, not misreadings, and the convention-aware score says which one matched:
 
-- **title** — case, accents, punctuation and a leading article folded; the subtitle is optional on either side.
-- **year** — the first 4-digit year on each side.
+- **title** — strict: case, accents, punctuation and a leading article folded; the subtitle optional on either side.
+  `title_conv`: MoMA composes its title from the series line and the artist (*Projects 82: Mark Dion: rescue
+  archaeology, a project for the Museum of Modern Art*) where the title page says *Rescue archaeology*. Match when the
+  gold equals series [number] + artists + title (+ subtitle) joined by `: `, or title + artists after the series
+  (`series+title`, `series+artist+title`, `artist+title`, `series+title+artists`); or when the read title (≥ 2 words)
+  is contained in the gold (`read_in_gold`); or the gold in the read title once a series prefix is stripped.
+- **year** — strict: the publication year read (copyright/imprint) = gold. `year_conv`: also a match when a year in
+  `exhibition_dates` equals the gold (`ok_exhibition_year`; the record sheet sometimes gives the exhibition year).
 - **publisher** — anything containing "Museum of Modern Art" or "MoMA" is one publisher; otherwise corporate suffixes
   and place names are dropped.
-- **author** — Calibre's first author vs the first person the model read (authors, then editors), as surname + first
-  initial in either name order; `ok_not_first` when the gold author is among them but not first. When Calibre's author
-  is MoMA itself (its placeholder when the sheet names no person) the field is `gold_corporate` and **not scored**.
+- **author** — strict: Calibre's first author = the first person read (authors, then editors), as surname + first
+  initial in either name order. `author_conv`: Calibre's first author is anywhere in authors ∪ **artists** ∪ editors
+  (also with the name tokens in another order, *Mingwei Lee* / *Lee Mingwei*); the result names the bucket
+  (`ok_artists`, …). MoMA files the **artist** as author of its brochures; the title page credits the essayist. When
+  Calibre's author is MoMA itself (its placeholder when the sheet names no person) the field is `gold_corporate` and
+  **not scored**.
 - **isbn** — any overlap, ISBN-10 and ISBN-13 treated as the same book.
 
 `both_empty` and `extra` (model read a value Calibre lacks) are reported but not scored. Prints per-field accuracy and
-every mismatch; writes `<root>/ident/_gold_summary.json` (accuracy, per-book rows, verification-status counts).
+every mismatch; writes `<root>/ident/_gold_summary.json` (accuracy, per-book rows, verification-status counts, total
+cost, median seconds per book). `--ident-dir` scores an earlier run's copy, `--summary` writes elsewhere.
 
 ## Measured results
 
-Measured 2026-11-02 on the Mac. **No Meta key yet**: the vision model was `qwen3.8:27b` through the local pool router
-(`--provider local --base-url http://127.0.0.1:11435/v1`), not Muse Spark. Muse Spark numbers are still to be measured.
+### Muse Spark 1.3, gold test on 20 books (`--skip-first 1`, on hub, 2026-11-02)
+
+Books 13183–13204 (20 MoMA brochures and catalogues, 2003–2005; 15 with a person as Calibre's author, 2 with an
+ISBN). "Before" = the coordinator's first run (prompt v1, no `artists` / `exhibition_dates`), rescored with the
+current gold code so both columns use the same rules; "after" = prompt v2 + schema fields, all 20 re-run, then 13191
+re-run once more after the two-publication rule was added.
+
+| field | before strict | before conv. | after strict | after conv. |
+|-------|---------------|--------------|--------------|-------------|
+| title | 15/20 | 20/20 | 12/20 | **20/20** |
+| year | 15/20 | 15/20 | 14/20 | **17/20** |
+| publisher | 18/20 | — | **19/20** | — |
+| author (15 scored, 5 MoMA-placeholder) | 0/15 | 2/15 | 2/15 | **15/15** (13 via `artists`, 2 via `authors`) |
+| ISBN (2 in gold) | 2/2 | — | 2/2 | — |
+| status | no_isbn 18, verified 2 | | no_isbn 18, verified 2 | |
+
+Strict title accuracy *falls* after the change, by design: the series line now goes to `series`, so the title reads
+*Jean Shin* where MoMA's record says *Projects 81: Jean Shin*; the convention-aware score shows nothing was lost.
+(The before run's strict author was 2/15 under the older scoring, which counted "gold author is the second person
+read"; it is 0/15 now that strict means first person.)
+
+Cost and speed: **$0.475 for the 20-book re-run** plus $0.040 for 13191's second re-run; 7–30k prompt tokens and
+0.5–1.5k completion tokens per book (≈ $0.024/book); **median 7.8 s per book**, 6–17 s, four in parallel. The
+coordinator's first run cost $0.47.
+
+Findings the scores hide:
+
+- **13191 is two brochures in one PDF**: *Lee Bontecou: a retrospective* (pages 1–~12) with *Projects 82: Mark
+  Dion* bundled at the end, which the back-pages window and the verso finder picked up. The first v2 run catalogued
+  the Mark Dion half (and said in notes that the scan holds two publications); with the two-publication rule it
+  catalogues the front one and names the other. Worth a look in the library.
+- **3 year mismatches remain and look like gold errors, not misreadings** (not checked by eye): 13185 *Focus:
+  Elizabeth Murray* — gold 1987, the brochure's printed line reads "©2005", exhibition Oct 2005 – Jan 2006; 13190
+  and 13192 — gold 2003, read 2004 with exhibitions in Nov 2004 and Jun 2004.
+- 13193 (*Roth Time*) publisher missed: no imprint on the pages sent, and the model left it empty rather than
+  assume MoMA.
+
+### Local model, first test (`qwen3.8:27b`, 3 books)
+
+Measured 2026-11-02 on the Mac before the Meta key existed: the vision model was `qwen3.8:27b` through the local pool
+router (`--provider local --base-url http://127.0.0.1:11435/v1`), prompt v1.
 
 ### Identifier, gold test on 3 books (`--skip-first 1`, so MoMA's record sheet was never shown)
 
@@ -143,7 +199,7 @@ at once); hence the retries. 13440's author is not scored: Calibre holds MoMA it
 
 Cost of one call: 16–19k prompt tokens (8–9 images at 1600 px) and 0.9–1.6k completion tokens (the record plus
 `notes`, which explain every empty field). Wall time 29–103 s per book on the local 27B with three books in
-parallel on the pool. At Muse Spark 1.3's list price that is about **$0.03 per book** (≈ 18k × $1.25/M + 1.4k ×
+parallel on the pool. At Muse Spark 1.3's list price that estimate was about **$0.03 per book** (≈ 18k × $1.25/M + 1.4k ×
 $4.25/M), i.e. ~$23 for all 757 MoMA books — an estimate from token counts, not a measured bill; Muse Spark's
 tokenisation of images will differ.
 
@@ -180,6 +236,6 @@ Files on hub: the gold dump `/srv/colophon/ident/_gold.json` (all 757 books, fro
 
 ### Not yet measured
 
-- Muse Spark itself (no key): accuracy, tokens, latency, cost.
-- More than 3 books through the model, and any image-only scan (no text layer, so no verso finder).
+- More than 20 books through Muse Spark, and any image-only scan (no text layer, so no verso finder).
 - The gold test is MoMA-only, where the publisher is almost always MoMA; publisher accuracy elsewhere is unknown.
+- Whether the three suspected gold-year errors are really gold errors (needs a look at the pages).

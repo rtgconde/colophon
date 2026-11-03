@@ -2,8 +2,8 @@
 """Identify each book from its front and back matter: one vision call per book → a catalogue record, then verify it.
 
 The cover and first pages plus the last pages are sent as images (downscaled) in ONE chat call; the model returns
-IDENTIFY_BOOK (title, subtitle, authors, editors, publisher, place, year, edition, ISBNs, series, language, the printed
-colophon line, per-field evidence). verify.py then checksums every ISBN and requires the OpenLibrary title for at least one
+IDENTIFY_BOOK (title, subtitle, authors, editors, artists, publisher, place, year, edition, ISBNs, series and number,
+exhibition dates, language, the printed colophon line, per-field evidence). verify.py then checksums every ISBN and requires the OpenLibrary title for at least one
 of them to match the title read from the title page. Output: <root>/ident/<id>.json. Idempotent: books with an ok output
 are skipped unless --force.
 
@@ -46,9 +46,22 @@ Ignore ISBNs of other titles (advertised books, "also available", a multi-volume
 Congress numbers are not ISBNs.
 - The COLOPHON (often on the last page: "printed by …", "designed by …", "edition of … copies") and the copyright line: \
 copy the most informative of those lines verbatim into printing_note.
-- Series and number only when printed as a series ("Projects 15", "Bulletin vol. 3 no. 2").
+- SERIES: a series line printed on the cover or the title page — "Projects 82", "Artist's Choice", "Bulletin of the \
+Museum of Modern Art, vol. 3 no. 2", "Exhibition 28" — is the series, NOT part of the title: series = its name \
+("Projects"), series_number = its number ("82"), and the title is what remains ("Rescue archaeology"). Only a line \
+actually printed as a series counts.
+- ARTISTS: the artist(s) the exhibition or book is about, as named on the cover or title page ("Mark Dion", \
+"Kiki Smith"), go in artists — also when they are the subject only. They go in authors as well only when the title \
+page credits them as writing the text.
+- EXHIBITION DATES: when the exhibition's dates are printed (cover, title page, verso, foreword: "March 5 – May 19, \
+2003"), copy them as printed into exhibition_dates; else "". The year field stays the PUBLICATION year (copyright / \
+imprint); never replace it with the exhibition year, and never fill one from the other.
 - language = ISO 639-1 of the main text.
 - evidence: one entry per field you filled, giving the image number it was read from.
+
+If the pages show MORE THAN ONE publication (a scan that bundles a second brochure at the end, an inserted \
+leaflet), catalogue the one the FRONT pages belong to — the first cover, title and imprint you see — and name the \
+other in notes; never mix fields from the two.
 
 NOTHING may be guessed, completed or recalled from memory. A field that is not printed on these pages is "" (or []). \
 If the pages disagree, prefer the title page and copyright page and explain in notes. confidence = high when the title \
@@ -123,7 +136,7 @@ def identify(client, root, book, a):
     t0 = time.time()
     try:
         r = client.chat(messages, schema=IDENTIFY_BOOK, schema_name="BookRecord", reasoning="minimal",
-                        max_tokens=a.max_tokens, prompt_cache_key="colophon-ident-v1")
+                        max_tokens=a.max_tokens, prompt_cache_key="colophon-ident-v2")
     except ChatError as e:
         return {**base, "ok": False, "error": str(e)[:500], "elapsed_s": round(time.time() - t0, 2)}
     out = {**base, "ok": r["json"] is not None, "model": r["model"], "elapsed_s": r["elapsed_s"],
