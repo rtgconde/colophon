@@ -1,0 +1,19 @@
+# secrets and local config
+.env
+*.env
+secrets*
+# data: pages, crops, state, models
+data/
+pages/
+crops/
+state/
+*.db
+*.sqlite*
+models/
+# python
+__pycache__/
+*.pyc
+.venv/
+# os / editors
+.DS_Store
+._*
