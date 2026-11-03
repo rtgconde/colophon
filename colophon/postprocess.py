@@ -2,8 +2,12 @@
 """Colophon post-processing: a worker's raw SAM detections for one page -> figures + crops (docs/PROTOCOL.md).
 
     1. merge   boxes overlapping at IoU >= 0.6 are one figure (highest score kept, every prompt name kept)
-    2. size    drop boxes under 1 % or over 85 % of the page area (PROTOCOL.md says 95 %; lowered 2026-11-03 because
-               SAM returns the page itself as a "photograph" at ~92 % of the page)
+    2. size    drop boxes under 1 % of the page area. A box over 85 % is KEPT as a full-bleed plate only when the
+               page carries little text (word boxes <= 5 % of the page area, or no text layer for the page) AND it is
+               the top-scoring box on the page; otherwise it is dropped (this also covers PROTOCOL.md's 95 % cap).
+               Why the top-score condition: on spark1's first 3,370 pages every one of the 89 boxes over 85 % sat
+               beside a higher-scoring box, and the 6 drawn and looked at were the scanned page's own edge around a
+               smaller plate (84 of the 89 were on low-text pages), so low text alone would have kept the frames.
     3. text    drop boxes whose area is >= 50 % covered by the PDF text layer (text/<id>.bbox.html);
                no text layer -> rule skipped, text_frac = null.
                Coverage is measured with pdftotext's LINE boxes, not its word boxes (a deviation from PROTOCOL.md):
@@ -31,7 +35,7 @@ import threading
 
 IOU_MERGE = 0.6
 AREA_MIN, AREA_MAX = 0.01, 0.85
-AREA_MAX_PROTOCOL = 0.95     # only to count how many boxes the lowered limit removes
+FULLBLEED_TEXT_MAX = 0.05    # page word-box area / page area under which a > 85 % top box is a full-bleed plate
 NEST_MAX = 0.9
 TEXT_MAX = 0.5
 MARGIN = 0.02
@@ -156,22 +160,30 @@ def _atomic_json(path, obj):
 
 def process_page(root, book, page, w, h, raw, text_page, has_text_layer):
     """Turn one raw result into figures/<book>/<nnnn>.json + crops. Returns (figures, drops): drops counts the boxes
-    each rule removed: merged, small, large (> 95 %), large_new (85-95 %), text, nested.
+    each rule removed: merged, small, large, text, nested; and large_kept_fullbleed, the > 85 % boxes kept as plates.
     text_page: that page's parsed text layer (None if absent); has_text_layer: whether the book has one at all."""
     from PIL import Image
 
     page_area = float(w * h)
     dets = clean_dets(raw, w, h)
     figs = merge(dets)
-    drops = dict.fromkeys(("merged", "small", "large", "large_new", "text", "nested"), 0)
+    drops = dict.fromkeys(("merged", "small", "large", "large_kept_fullbleed", "text", "nested"), 0)
     drops["merged"] = len(dets) - len(figs)
+    top = max((f["score"] for f in figs), default=0)
+    if text_page:
+        low_text = sum(area(wd) for wd in text_page["words"]) <= FULLBLEED_TEXT_MAX * text_page["w"] * text_page["h"]
+    else:
+        low_text = True                     # no text layer (for the book, or for this page): only the top score decides
     cand = []
     for f in figs:
         af = area(f["box"]) / page_area
         if af < AREA_MIN:
             drops["small"] += 1; continue
         if af > AREA_MAX:
-            drops["large" if af > AREA_MAX_PROTOCOL else "large_new"] += 1; continue
+            if low_text and f["score"] >= top:
+                drops["large_kept_fullbleed"] += 1
+            else:
+                drops["large"] += 1; continue
         if has_text_layer:
             tf = text_fraction(f["box"], text_page, w, h) if text_page else 0.0
             if tf >= TEXT_MAX:

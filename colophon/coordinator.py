@@ -42,7 +42,7 @@ RESCAN_S, STATUS_S, EXPIRE_S = 300, 60, 30
 POSTPP = int(os.environ.get("COLOPHON_POSTPP", "2"))
 CONFIG = {"prompts": ["painting", "photograph", "drawing", "print", "sculpture", "map", "diagram", "illustration"],
           "score_min": 0.30, "max_per_prompt": 40, "long_side": 2000}
-DROP_KEYS = ("merged", "small", "large", "large_new", "text", "nested")
+DROP_KEYS = ("merged", "small", "large", "large_kept_fullbleed", "text", "nested")   # drop_large_new: unused since 11-03
 PAGE_RE = re.compile(r"^/page/(\d+)/(\d{4})\.jpg$")
 
 wlock = threading.Lock()        # one writer at a time (SQLite allows one anyway; this keeps the retries out of it)

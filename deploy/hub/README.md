@@ -42,7 +42,8 @@ cat /srv/colophon/status.json                              # same data, as of th
 - `postprocess`: counts of `todo`, `running`, `done` and `error`, for done pages.
 - `figures`: the number of crops, and the number of pages that have at least one.
 - `boxes_dropped`: how many boxes each post-processing rule removed, summed over post-processed pages. The keys are
-  `merged`, `small`, `large` (over 95 %), `large_new` (85–95 %), `text` and `nested`. The same counts are stored per
+  `merged`, `small`, `large` (over 85 % and dropped), `large_kept_fullbleed` (over 85 % but kept as a plate), `text`
+  and `nested`. The column `drop_large_new` is left over from an earlier rule and is no longer written. The same counts are stored per
   page in the `drop_*` columns of `pages`.
 - `pages_per_min_last_hour`.
 - `eta_minutes`: queued + leased pages at that rate. It leaves out pages still rendering.
@@ -68,8 +69,12 @@ to `todo` at start-up. Workers see connection errors for about a second.
   whose lease expired, or that someone else holds, is still accepted. The last result wins.
 - **Post-processing** (`postprocess.py`):
   1. Boxes are merged at IoU ≥ 0.6, across all prompts.
-  2. Boxes outside 1–85 % of the page area are dropped. PROTOCOL.md says 95 %; this was lowered on 2026-11-03
-     because SAM returns the page itself at about 92 %.
+  2. Boxes under 1 % of the page area are dropped. A box over 85 % is kept as a **full-bleed plate** only when the
+     page has little text and the box is the top-scoring box on the page. "Little text" means the word boxes cover
+     ≤ 5 % of the page area, or the page has no text layer. Every other box over 85 % is dropped, which also covers
+     PROTOCOL.md's 95 % cap. The top-score condition was added because, on the first 3,370 pages, all 89 boxes over
+     85 % sat beside a higher-scoring box. Six of them were drawn and looked at: each was the scanned page's own edge
+     around a smaller plate, and 84 of the 89 were on low-text pages.
   3. Boxes ≥ 50 % covered by text are dropped.
   4. A box that lies ≥ 90 % inside a higher-scoring kept box is dropped. This catches low-score "drawing" boxes on
      figures inside a painting, which IoU cannot remove. It runs after the size and text rules, so a page-sized or
@@ -130,6 +135,9 @@ Both paths were checked from the Mac. To remove the rules, run `sudo ufw status 
   word boxes reached 50 % coverage on only 72 % of blocks, because the gaps between words count as uncovered. Line
   boxes reach 87 %. Ragged captions still slip through: one caption block had 29 % line coverage. In the live test,
   67 of 84 synthetic text-block boxes were dropped (80 %). The reading step's `kind`/`page_kind` must catch the rest.
+- **Full-bleed rule (2026-11-03, second pass).** It kept 2 of the first 3,721 pages. 13739/0156 is a real full-page
+  map (score 0.82). 13739/0150 is a false positive: a blank endpaper or cover that was its page's only detection,
+  at score 0.32. If more of these show up, add a score floor for full-bleed plates (about 0.5).
 - **Whole-page boxes and nested boxes** were fixed on 2026-11-03 with `AREA_MAX` 0.85 and the nesting rule. Over
   spark1's first 1,052 pages (14 books), figures went from 726 to 561. The 85 % limit removed 37 boxes and the
   nesting rule removed 128. No page lost all of its figures: 496 pages had figures before and after. The text rule
