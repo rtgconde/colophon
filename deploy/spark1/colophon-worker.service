@@ -1,0 +1,21 @@
+# Colophon SAM 3.1 worker on spark1 (systemd --user; colophon has Linger=yes).
+# Install: deploy/spark1/install.sh copies this to ~/.config/systemd/user/.
+# Start:   systemctl --user enable --now colophon-worker
+[Unit]
+Description=Colophon SAM 3.1 figure-segmentation worker (coordinator on hub :8101)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/services/colophon-worker
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/services/colophon-worker/venv/bin/python %h/services/colophon-worker/worker_sam.py --coordinator http://hub:8101 --name spark1 --batch 4 --log %h/scratch/2026-11-02-colophon/worker.log
+Restart=on-failure
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Nice=5
+
+[Install]
+WantedBy=default.target

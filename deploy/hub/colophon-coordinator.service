@@ -1,0 +1,23 @@
+# Colophon coordinator: hands rendered pages to SAM 3.1 workers on :8101, stores results, post-processes them.
+# Install: sudo install -m 644 colophon-coordinator.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          && sudo systemctl enable --now colophon-coordinator          (deploy/hub/README.md)
+[Unit]
+Description=Colophon coordinator (SAM 3.1 page queue, :8101)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=colophon
+Group=colophon
+WorkingDirectory=/srv/colophon
+Environment=PYTHONUNBUFFERED=1
+Environment=COLOPHON_ROOT=/srv/colophon
+ExecStart=/home/colophon/.venvs/colophon/bin/python /srv/colophon/app/coordinator.py
+Restart=on-failure
+RestartSec=5
+# modest: the page render and the rest of hub come first
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
