@@ -4,7 +4,7 @@
     1. merge   boxes overlapping at IoU >= 0.6 are one figure (highest score kept, every prompt name kept)
     2. size    drop boxes under 1 % of the page area. A box over 85 % is KEPT as a full-bleed plate only when the
                page carries little text (word boxes <= 5 % of the page area, or no text layer for the page) AND it is
-               the top-scoring box on the page; otherwise it is dropped (this also covers PROTOCOL.md's 95 % cap).
+               the top-scoring box on the page with a score >= 0.5; otherwise it is dropped (this also covers PROTOCOL.md's 95 % cap).
                Why the top-score condition: on spark1's first 3,370 pages every one of the 89 boxes over 85 % sat
                beside a higher-scoring box, and the 6 drawn and looked at were the scanned page's own edge around a
                smaller plate (84 of the 89 were on low-text pages), so low text alone would have kept the frames.
@@ -36,6 +36,7 @@ import threading
 IOU_MERGE = 0.6
 AREA_MIN, AREA_MAX = 0.01, 0.85
 FULLBLEED_TEXT_MAX = 0.05    # page word-box area / page area under which a > 85 % top box is a full-bleed plate
+FULLBLEED_SCORE_MIN = 0.5    # ... and its score must reach this (a blank endpaper scored 0.32, a real map 0.82)
 NEST_MAX = 0.9
 TEXT_MAX = 0.5
 MARGIN = 0.02
@@ -180,7 +181,7 @@ def process_page(root, book, page, w, h, raw, text_page, has_text_layer):
         if af < AREA_MIN:
             drops["small"] += 1; continue
         if af > AREA_MAX:
-            if low_text and f["score"] >= top:
+            if low_text and f["score"] >= top and f["score"] >= FULLBLEED_SCORE_MIN:
                 drops["large_kept_fullbleed"] += 1
             else:
                 drops["large"] += 1; continue
