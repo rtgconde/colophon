@@ -8,6 +8,7 @@ into figure crops. The contract is docs/PROTOCOL.md; this is its server side.
     coordinator.py --reset-book 13183     # every page of a book
     coordinator.py --reset-worker fake    # every page currently owned by a worker named fake* (+ all fake* events)
     coordinator.py --reprocess 13183      # re-run post-processing for a book's done pages (after a rule change)
+    coordinator.py --reprocess all        # ... for every done page
 
 Shape after the earlier OCR coordinator (an earlier OCR coordinator): stdlib http.server + sqlite3 and a
 few threads. No auth: page images of a public set (MoMA's free catalogues), on the LAN and the private network only.
@@ -41,6 +42,7 @@ RESCAN_S, STATUS_S, EXPIRE_S = 300, 60, 30
 POSTPP = int(os.environ.get("COLOPHON_POSTPP", "2"))
 CONFIG = {"prompts": ["painting", "photograph", "drawing", "print", "sculpture", "map", "diagram", "illustration"],
           "score_min": 0.30, "max_per_prompt": 40, "long_side": 2000}
+DROP_KEYS = ("merged", "small", "large", "large_new", "text", "nested")
 PAGE_RE = re.compile(r"^/page/(\d+)/(\d{4})\.jpg$")
 
 wlock = threading.Lock()        # one writer at a time (SQLite allows one anyway; this keeps the retries out of it)
@@ -73,6 +75,10 @@ def init():
       CREATE INDEX IF NOT EXISTS pages_pp ON pages(pp);
       CREATE TABLE IF NOT EXISTS events(t REAL, worker TEXT, kind TEXT, book INTEGER, page INTEGER, elapsed_s REAL);
       CREATE INDEX IF NOT EXISTS events_t ON events(t);""")
+    have = {r[1] for r in c.execute("PRAGMA table_info(pages)")}
+    for k in DROP_KEYS:                                                  # per-rule drop counts (added 2026-11-03)
+        if f"drop_{k}" not in have:
+            c.execute(f"ALTER TABLE pages ADD COLUMN drop_{k} INTEGER")
     c.execute("UPDATE pages SET pp='todo' WHERE pp='running'")          # interrupted post-processing
     rescan()
 
@@ -216,15 +222,17 @@ def postprocess_loop(stop, tcache):
             if not w:
                 from PIL import Image
                 w, h = Image.open(page_path(book, page)).size
-            figs = postprocess.process_page(ROOT, book, page, w, h, raw,
-                                            tcache.page(book, page) if text_layer else None, bool(text_layer))
+            figs, drops = postprocess.process_page(ROOT, book, page, w, h, raw,
+                                                   tcache.page(book, page) if text_layer else None, bool(text_layer))
             state, nf, err = "done", len(figs), None
         except Exception as e:
-            state, nf, err = "error", None, f"postprocess: {type(e).__name__}: {e}"
+            state, nf, err, drops = "error", None, f"postprocess: {type(e).__name__}: {e}", {}
             print(f"postprocess {book}/{page:04d} failed: {err}", flush=True)
         with wlock:
-            c.execute("UPDATE pages SET pp=?, n_fig=?, error=coalesce(?, error) WHERE book=? AND page=? AND pp='running'",
-                      (state, nf, err, book, page))
+            c.execute("UPDATE pages SET pp=?, n_fig=?, error=coalesce(?, error), "
+                      + ", ".join(f"drop_{k}=?" for k in DROP_KEYS)
+                      + " WHERE book=? AND page=? AND pp='running'",
+                      (state, nf, err, *[drops.get(k) for k in DROP_KEYS], book, page))
 
 
 # ---------------------------------------------------------------- status
@@ -237,6 +245,8 @@ def status():
         states.setdefault(s, 0)
     pp = dict(c.execute("SELECT coalesce(pp,'-'), count(*) FROM pages WHERE state='done' GROUP BY 1").fetchall())
     figs = c.execute("SELECT coalesce(sum(n_fig),0), count(*) FROM pages WHERE pp='done' AND n_fig>0").fetchone()
+    dropped = dict(zip(DROP_KEYS, c.execute("SELECT " + ", ".join(f"coalesce(sum(drop_{k}),0)" for k in DROP_KEYS)
+                                            + " FROM pages WHERE pp='done'").fetchone()))
     bk = c.execute("SELECT count(*), coalesce(sum(complete),0), coalesce(sum(pages),0) FROM books").fetchone()
     first = c.execute("SELECT min(t) FROM events WHERE kind='done' AND t > ?", (now - 3600,)).fetchone()[0]
     done_h = c.execute("SELECT count(*) FROM events WHERE kind='done' AND t > ?", (now - 3600,)).fetchone()[0]
@@ -266,6 +276,7 @@ def status():
         "books": {"known": bk[0], "render_complete": bk[1], "pages_expected": bk[2]},
         "postprocess": pp,
         "figures": {"total": figs[0], "pages_with_figures": figs[1]},
+        "boxes_dropped": dropped,
         "pages_per_min_last_hour": round(rate, 2),
         "eta_minutes": eta_min,
         "eta_note": "queued+leased pages at the last hour's rate; pages still rendering are not counted",
@@ -432,7 +443,10 @@ def main():
         return
     if a and a[0] == "--reprocess" and len(a) == 2:
         with wlock:
-            n = db().execute("UPDATE pages SET pp='todo' WHERE book=? AND state='done'", (int(a[1]),)).rowcount
+            if a[1] == "all":
+                n = db().execute("UPDATE pages SET pp='todo' WHERE state='done'").rowcount
+            else:
+                n = db().execute("UPDATE pages SET pp='todo' WHERE book=? AND state='done'", (int(a[1]),)).rowcount
         print(f"{n} pages marked for post-processing (the running service picks them up within 10 s)")
         return
     if a:

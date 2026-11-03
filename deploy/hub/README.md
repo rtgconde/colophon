@@ -41,6 +41,9 @@ cat /srv/colophon/status.json                              # same data, as of th
 - `pages_not_yet_rendered`: pages in `books.json` that have no JPEG yet.
 - `postprocess`: counts of `todo`, `running`, `done` and `error`, for done pages.
 - `figures`: the number of crops, and the number of pages that have at least one.
+- `boxes_dropped`: how many boxes each post-processing rule removed, summed over post-processed pages. The keys are
+  `merged`, `small`, `large` (over 95 %), `large_new` (85–95 %), `text` and `nested`. The same counts are stored per
+  page in the `drop_*` columns of `pages`.
 - `pages_per_min_last_hour`.
 - `eta_minutes`: queued + leased pages at that rate. It leaves out pages still rendering.
 - `workers`: done, failed, done in the last hour, mean `elapsed_s`, leased now, and last seen, per worker name.
@@ -65,9 +68,13 @@ to `todo` at start-up. Workers see connection errors for about a second.
   whose lease expired, or that someone else holds, is still accepted. The last result wins.
 - **Post-processing** (`postprocess.py`):
   1. Boxes are merged at IoU ≥ 0.6, across all prompts.
-  2. Boxes outside 1–95 % of the page area are dropped.
+  2. Boxes outside 1–85 % of the page area are dropped. PROTOCOL.md says 95 %; this was lowered on 2026-11-03
+     because SAM returns the page itself at about 92 %.
   3. Boxes ≥ 50 % covered by text are dropped.
-  4. Each remaining box is cropped with a 2 % margin of the box's own size, to `crops/<id>/<nnnn>-<k>.jpg` (q90).
+  4. A box that lies ≥ 90 % inside a higher-scoring kept box is dropped. This catches low-score "drawing" boxes on
+     figures inside a painting, which IoU cannot remove. It runs after the size and text rules, so a page-sized or
+     text-block box never removes a real figure.
+  5. Each remaining box is cropped with a 2 % margin of the box's own size, to `crops/<id>/<nnnn>-<k>.jpg` (q90).
   5. The figures are written to `figures/<id>/<nnnn>.json`, with paths relative to `/srv/colophon` and `k` in
      reading order.
 
@@ -84,6 +91,7 @@ cd /srv/colophon
 ~/.venvs/colophon/bin/python app/coordinator.py --reset-book 13183       # a whole book
 ~/.venvs/colophon/bin/python app/coordinator.py --reset-worker fake      # pages currently owned by fake* workers
 ~/.venvs/colophon/bin/python app/coordinator.py --reprocess 13183        # re-post-process a book's done pages
+~/.venvs/colophon/bin/python app/coordinator.py --reprocess all          # ... every done page (about 1,100 pages/min)
 ```
 
 A reset puts the page back to `queued`. It clears the page's fails and expiries and deletes its
@@ -122,9 +130,10 @@ Both paths were checked from the Mac. To remove the rules, run `sudo ufw status 
   word boxes reached 50 % coverage on only 72 % of blocks, because the gaps between words count as uncovered. Line
   boxes reach 87 %. Ragged captions still slip through: one caption block had 29 % line coverage. In the live test,
   67 of 84 synthetic text-block boxes were dropped (80 %). The reading step's `kind`/`page_kind` must catch the rest.
-- **Whole-page boxes.** The first real SAM results (spark1) include a box at 92.6 % of the page area, the page
-  itself, which passes the 95 % rule. If this is common, lower `AREA_MAX` in `postprocess.py` (to about 0.85) and run
-  `--reprocess`.
+- **Whole-page boxes and nested boxes** were fixed on 2026-11-03 with `AREA_MAX` 0.85 and the nesting rule. Over
+  spark1's first 1,052 pages (14 books), figures went from 726 to 561. The 85 % limit removed 37 boxes and the
+  nesting rule removed 128. No page lost all of its figures: 496 pages had figures before and after. The text rule
+  removed nothing from real SAM output; the highest `text_frac` kept was 0.27.
 - **`ps`/`pgrep` over ssh match themselves.** Find the process with `ss -ltnp | grep 8101` or
   `systemctl status colophon-coordinator` instead. Never kill and restart in one ssh line.
 - The render (`app/render.py`, 12 processes) shares the CPU. Post-processing stays at 2 threads, and the unit runs at

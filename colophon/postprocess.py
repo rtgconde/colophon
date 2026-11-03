@@ -2,7 +2,8 @@
 """Colophon post-processing: a worker's raw SAM detections for one page -> figures + crops (docs/PROTOCOL.md).
 
     1. merge   boxes overlapping at IoU >= 0.6 are one figure (highest score kept, every prompt name kept)
-    2. size    drop boxes under 1 % or over 95 % of the page area
+    2. size    drop boxes under 1 % or over 85 % of the page area (PROTOCOL.md says 95 %; lowered 2026-11-03 because
+               SAM returns the page itself as a "photograph" at ~92 % of the page)
     3. text    drop boxes whose area is >= 50 % covered by the PDF text layer (text/<id>.bbox.html);
                no text layer -> rule skipped, text_frac = null.
                Coverage is measured with pdftotext's LINE boxes, not its word boxes (a deviation from PROTOCOL.md):
@@ -10,6 +11,9 @@
                block's area by only 54 % at the median and reach 50 % for just 72 % of blocks (the gaps between words
                and lines count as uncovered), so a SAM box over a text column often survived. Line boxes reach 50 %
                for 87 % of blocks (median 66 %). Line boxes span the gaps between words, never between lines.
+    3b nest    drop a box that lies >= 90 % inside a higher-scoring kept box (SAM's low-score "drawing" boxes on
+               figures painted inside a painting; IoU cannot catch them). Run after size and text, so only boxes that
+               survived as figures can swallow others: a page-sized or text-block box never removes a real figure.
     4. crop    box + 2 % margin (of the box's own width/height, each side) from the rendered JPEG, JPEG q90
                -> crops/<id>/<nnnn>-<k>.jpg; figures/<id>/<nnnn>.json
 
@@ -26,7 +30,9 @@ import re
 import threading
 
 IOU_MERGE = 0.6
-AREA_MIN, AREA_MAX = 0.01, 0.95
+AREA_MIN, AREA_MAX = 0.01, 0.85
+AREA_MAX_PROTOCOL = 0.95     # only to count how many boxes the lowered limit removes
+NEST_MAX = 0.9
 TEXT_MAX = 0.5
 MARGIN = 0.02
 JPEG_Q = 90
@@ -149,24 +155,36 @@ def _atomic_json(path, obj):
 
 
 def process_page(root, book, page, w, h, raw, text_page, has_text_layer):
-    """Turn one raw result into figures/<book>/<nnnn>.json + crops. Returns the figures list.
+    """Turn one raw result into figures/<book>/<nnnn>.json + crops. Returns (figures, drops): drops counts the boxes
+    each rule removed: merged, small, large (> 95 %), large_new (85-95 %), text, nested.
     text_page: that page's parsed text layer (None if absent); has_text_layer: whether the book has one at all."""
     from PIL import Image
 
     page_area = float(w * h)
-    figs = merge(clean_dets(raw, w, h))
-    keep = []
+    dets = clean_dets(raw, w, h)
+    figs = merge(dets)
+    drops = dict.fromkeys(("merged", "small", "large", "large_new", "text", "nested"), 0)
+    drops["merged"] = len(dets) - len(figs)
+    cand = []
     for f in figs:
         af = area(f["box"]) / page_area
-        if af < AREA_MIN or af > AREA_MAX:
-            continue
+        if af < AREA_MIN:
+            drops["small"] += 1; continue
+        if af > AREA_MAX:
+            drops["large" if af > AREA_MAX_PROTOCOL else "large_new"] += 1; continue
         if has_text_layer:
             tf = text_fraction(f["box"], text_page, w, h) if text_page else 0.0
             if tf >= TEXT_MAX:
-                continue
+                drops["text"] += 1; continue
         else:
             tf = None
         f["area_frac"], f["text_frac"] = round(af, 4), (round(tf, 4) if tf is not None else None)
+        cand.append(f)
+    keep = []
+    for f in sorted(cand, key=lambda f: -f["score"]):           # nesting: best score first, only kept boxes contain
+        a = area(f["box"])
+        if any(g["score"] >= f["score"] and inter(f["box"], g["box"]) >= NEST_MAX * a for g in keep):
+            drops["nested"] += 1; continue
         keep.append(f)
     keep.sort(key=lambda f: (round(f["box"][1] / (h * 0.05)), f["box"][0]))   # rows of 5 % page height, then x
 
@@ -194,7 +212,7 @@ def process_page(root, book, page, w, h, raw, text_page, has_text_layer):
             out.append({"k": k, "box": [int(round(v)) for v in f["box"]], "score": round(f["score"], 4),
                         "prompts": f["prompts"], "crop": rel, "area_frac": f["area_frac"], "text_frac": f["text_frac"]})
     _atomic_json(f"{root}/figures/{book}/{page:04d}.json", out)
-    return out
+    return out, drops
 
 
 def main():
@@ -209,7 +227,8 @@ def main():
     w, h = Image.open(f"{a.root}/pages/{a.book}/{a.page:04d}.jpg").size
     tc = TextCache(a.root, 1)
     has = os.path.exists(f"{a.root}/text/{a.book}.bbox.html")
-    print(json.dumps(process_page(a.root, a.book, a.page, w, h, raw, tc.page(a.book, a.page), has), indent=1))
+    out, drops = process_page(a.root, a.book, a.page, w, h, raw, tc.page(a.book, a.page), has)
+    print(json.dumps({"figures": out, "dropped": drops}, indent=1))
 
 
 if __name__ == "__main__":
