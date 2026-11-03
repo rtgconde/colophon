@@ -4,7 +4,7 @@
 BUDGET=${BUDGET:-92}
 cd /srv/colophon
 touch read/STOP
-pkill -f "[r]ead-loop.sh" || true
+pkill -f "^bash app/read-loop.sh" || true
 pkill -f "[a]pp/reader.py --root" || true
 sleep 3
 rm -f read/STOP

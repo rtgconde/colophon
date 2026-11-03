@@ -7,7 +7,7 @@ while :; do
   total=$(python3 - <<'PY'
 import glob, json
 t = 0.0
-for f in glob.glob("read/*/*.json") + glob.glob("ident/*.json"):
+for f in glob.glob("read/*/*.json") + glob.glob("ident/[0-9]*.json"):
     try:
         t += json.load(open(f)).get("cost_usd") or 0
     except Exception:
@@ -19,7 +19,7 @@ PY
   if python3 -c "import sys; sys.exit(0 if float('$total') >= float('$LIMIT') else 1)"; then
     echo "$(date -u +%FT%TZ) LIMIT REACHED: stopping the read loop and readers" >> logs/spend-guard.log
     touch read/STOP
-    pkill -f "[r]ead-loop.sh" || true
+    pkill -f "^bash app/read-loop.sh" || true
     pkill -f "[a]pp/reader.py --root" || true
     pkill -f "[a]pp/identify.py" || true
   fi
