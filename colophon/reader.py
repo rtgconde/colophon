@@ -45,10 +45,17 @@ def draw_boxes(page_path, figures, long_side):
         scale = 1.0
     d = ImageDraw.Draw(im)
     lw = max(3, round(im.width / 400))
-    try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", max(18, im.width // 45))
-    except OSError:
-        font = ImageFont.load_default()
+    size = max(22, im.width // 40)
+    font = None
+    for cand in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuSans-Bold.ttf",
+                 "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/Library/Fonts/Arial Bold.ttf"):
+        try:
+            font = ImageFont.truetype(cand, size)
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default(size=size) if hasattr(ImageFont, "load_default") else ImageFont.load_default()
     for f in figures:
         x0, y0, x1, y1 = [v * scale for v in f["box"]]
         d.rectangle([x0, y0, x1, y1], outline=(220, 0, 0), width=lw)
