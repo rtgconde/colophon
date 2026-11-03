@@ -292,10 +292,16 @@ def build_points(root, books, book, page, read):
     by_k = {f.get("k"): f for f in figs_raw}
     bk = books.get(book, {})
     out = []
+    seen = set()
     for f in read.get("figures") or []:
         if not f.get("is_figure"):
             continue
         k = f.get("k")
+        if k in seen:
+            # The model numbered two entries alike (read/13444/0385.json had k=0 twice). (book, page, k) is the
+            # key in SQLite and the point id in Qdrant, so a repeat would abort the whole pass; keep the first.
+            continue
+        seen.add(k)
         geo = by_k.get(k, {})
         crop = geo.get("crop") or f"crops/{book}/{page:04d}-{k}.jpg"
         payload = {fld: f.get(fld, "") for fld in PAYLOAD_FIELDS}
@@ -371,7 +377,7 @@ def run_once(root, db, emb, qd, books):
             if qpts:
                 qd.upsert(qpts)
             db.execute("DELETE FROM figures WHERE book=? AND page=?", (book, page))
-            db.executemany("INSERT INTO figures VALUES (?,?,?,?,?,?,?)",
+            db.executemany("INSERT OR REPLACE INTO figures VALUES (?,?,?,?,?,?,?)",
                            [(book, page, pl["k"], pl["work_key"], pl["artist_norm"], pl["kind"],
                              json.dumps(pl, ensure_ascii=False)) for _, _, pl in pts])
             db.execute("INSERT OR REPLACE INTO pages VALUES (?,?,?,?,?,?)",
