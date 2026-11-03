@@ -3,7 +3,7 @@
 **A visual index and an identifier for a scanned library, built on Meta's SAM 3.1 and Muse Spark.**
 
 Built for the Meta Global AI Developer Hackathon 2026 (October 26 – November 4), indie track, theme *Build for Your
-World*, over 2–3 November. Demo video: *link added at submission*. The live instance runs on the author's home network
+World*, over 2–3 November. Demo video: *link added at submission* (made with the tooling in `demo/`). The live instance runs on the author's home network
 (its page renders and crops take 45 GB), so the video and the screenshots below are the demo; everything needed to
 rebuild it from MoMA's public PDFs is in this repository.
 
@@ -211,6 +211,7 @@ docs/IDENTIFIER.md   the identifier, the verification rules and why, the gold te
 docs/RESULTS.md      every number on the demo set
 docs/demo-set.csv    the 757 MoMA catalogues with their URLs
 docs/DEMO.md         the three-minute demo: script, shot list, the exact queries and commands
+demo/                how the demo video was made from the live instance (Playwright, Kokoro, ffmpeg)
 ```
 
 No scans, page images, API keys or model weights are in the repository.

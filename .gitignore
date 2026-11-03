@@ -17,3 +17,5 @@ __pycache__/
 # os / editors
 .DS_Store
 ._*
+# the rendered demo video (43 MB) stays out of git
+demo/*.mp4
