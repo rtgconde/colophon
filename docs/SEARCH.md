@@ -3,7 +3,7 @@
 Every figure that Muse Spark read (`read/<book>/<nnnn>.json`, `is_figure: true`) becomes one point in Qdrant. Its text
 is embedded with bge-m3, and `serve.py` searches it.
 
-- **Page:** <http://hub:8102> on the private network, `http://hub:8102` on the LAN. No login.
+- **Page:** <http://hub:8102> (private network or LAN; `hub` is the coordinator host). No login.
 - **Code:** `colophon/index.py` (indexer, also the shared helpers), `colophon/serve.py` (stdlib `http.server`),
   `colophon/static/` (one HTML page, css, js, three IBM Plex Serif woff2 files copied from the owner's wiki reader).
   It is deployed to `/srv/colophon/app/`.
@@ -119,9 +119,10 @@ sudo ufw allow from <vpn-subnet>  to any port 8102 proto tcp comment "Colophon s
 
 To remove them, run `sudo ufw status numbered` and then `sudo ufw delete <n>`, highest number first.
 
-## Numbers (2026-11-03, 04:05 UTC)
+## Numbers (2026-11-03, 14:08 UTC, the reads paused at $16.31)
 
-- **Index:** 988 pages read, 1,223 figures, 22 books, 28 works in 2 or more catalogues.
+- **Index:** 2,915 pages read, 4,546 figures, 53 books, 260 works in 2 or more catalogues (4,546 Qdrant points).
+  The reads cover the oldest catalogues first (the queue is in year order): 1929 to 1938.
 - **Embedding rate:** about 20 figures/s on mlbox's CPU, in batches of 32.
 - **Query latency, from the Mac over the private network:** 55–85 ms end to end (embed ~50–60 ms, Qdrant ~5 ms). The first
   query after a tunnel opens takes ~1 s.
@@ -131,6 +132,12 @@ To remove them, run `sudo ufw status numbered` and then `sudo ufw delete <n>`, h
 - **No auth**, the same as the coordinator. The data is MoMA's public catalogues.
 - **infinity is loopback-only on mlbox.** That is by design and was not changed. If mlbox reboots, the tunnels reconnect
   on the next query or pass. The indexer logs `pass failed:` and retries in 2 min.
+- **A repeated figure number aborts a whole pass, and the unit stays "active".** `read/13444/0385.json` came back
+  with two figures numbered `k: 0`. `(book, page, k)` is the SQLite primary key and the Qdrant point id, so the
+  INSERT failed, the pass's transaction rolled back, and every pass for ten hours logged `pass failed: UNIQUE
+  constraint failed` while `/api/stats` sat at 1,525 pages and `systemctl` said all was well. `build_points` now
+  keeps the first of a repeated `k`, and the INSERT is `OR REPLACE`. Watch the journal for `pass failed`, not the
+  unit state; and a health check should compare `pages read` in the log with `ls read/*/*.json | wc -l`.
 - **`ps`/`pgrep` over ssh match themselves.** Check with `ss -ltn | grep -E '8102|1799[67]'` or `systemctl status`.
 - The read files hold whatever the model wrote. Artist spellings vary ("LAUTREC" / "TOULOUSE-LAUTREC"), so the artist
   facet splits them. The works key takes the last token of the folded name, so those two do join there; "VAN GOGH"

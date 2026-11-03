@@ -139,6 +139,17 @@ cost, median seconds per book). `--ident-dir` scores an earlier run's copy, `--s
 
 ## Measured results
 
+### Muse Spark 1.3, gold test on all 757 books (`--skip-first 1`, on hub, 2026-11-03)
+
+The full run, four books in parallel (`deploy/hub/run-identify-all.sh`): 521 books on 11-02/03, the remaining 236
+after a pause, **$23.21** in all, **median 7.46 s per book**. Per field: title **569/757** strict, **709/757**
+convention-aware; year **615/756**, **682/756**; publisher **609/710**; author **169/423** strict, **361/423**
+convention-aware (334 gold records are MoMA's own placeholder and are not scored); ISBN **203/220**. Verification:
+169 `verified`, 544 `no_isbn`, 38 `unverifiable`, 6 `isbn_mismatch`. The table with the per-bucket counts and what
+the scores hide is `docs/RESULTS.md` § 4. The 20-book run below is where the prompt and the conventions came from;
+its numbers held at scale (title conv. 100 % → 94 %, author conv. 100 % → 85 %, year conv. 85 % → 90 %,
+publisher 95 % → 86 %).
+
 ### Muse Spark 1.3, gold test on 20 books (`--skip-first 1`, on hub, 2026-11-02)
 
 Books 13183–13204 (20 MoMA brochures and catalogues, 2003–2005; 15 with a person as Calibre's author, 2 with an
@@ -236,6 +247,7 @@ Files on hub: the gold dump `/srv/colophon/ident/_gold.json` (all 757 books, fro
 
 ### Not yet measured
 
-- More than 20 books through Muse Spark, and any image-only scan (no text layer, so no verso finder).
+- Any image-only scan (no text layer, so no verso finder); the MoMA set has text layers throughout.
 - The gold test is MoMA-only, where the publisher is almost always MoMA; publisher accuracy elsewhere is unknown.
-- Whether the three suspected gold-year errors are really gold errors (needs a look at the pages).
+- Whether the three suspected gold-year errors are really gold errors (needs a look at the pages), and what the
+  6 `isbn_mismatch` books of the full run are (a wrong ISBN on MoMA's sheet, or OpenLibrary's).

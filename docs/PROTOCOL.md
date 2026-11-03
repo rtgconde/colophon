@@ -21,7 +21,7 @@ coordinator; they never mount anything.
   logs/
 ```
 
-## Coordinator HTTP API (hub, private network address `hub`, port 8098 is Kiwix — use **8101**)
+## Coordinator HTTP API (hub, port **8101**)
 
 All bodies are JSON. Coordinates are **pixels of the served JPEG** (`w`, `h` are given with every lease).
 

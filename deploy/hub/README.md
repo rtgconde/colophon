@@ -4,7 +4,7 @@ The coordinator hands rendered book pages to the SAM 3.1 workers and stores what
 each result into figure crops. The contract it serves is `docs/PROTOCOL.md`. The code is `colophon/coordinator.py`,
 `colophon/postprocess.py` and `colophon/fake_worker.py`.
 
-- **Address:** `http://hub:8101` on the private network, `http://hub:8101` on the LAN. Bound to `0.0.0.0`.
+- **Address:** `http://hub:8101` (private network or LAN). Bound to `0.0.0.0`.
 - **Unit:** `colophon-coordinator.service`, a system unit that runs as `colophon` from `/srv/colophon`, with the venv
   `~/.venvs/colophon` (Pillow), `Nice=5`, and logs in the journal.
 - **State:** `/srv/colophon/state.db` (SQLite, WAL). `/srv/colophon/status.json` is rewritten every minute.
@@ -147,3 +147,44 @@ Both paths were checked from the Mac. To remove the rules, run `sudo ufw status 
   `systemctl status colophon-coordinator` instead. Never kill and restart in one ssh line.
 - The render (`app/render.py`, 12 processes) shares the CPU. Post-processing stays at 2 threads, and the unit runs at
   `Nice=5`.
+
+## The Meta API jobs: page reads, the identifier, and the spend guards
+
+Everything that calls the Meta Model API runs from `/srv/colophon` as `colophon`, started by hand and detached
+(`setsid nohup … &`), never as a unit: a reboot must not restart spending. The key is in
+`~/.config/colophon/meta.env` (0600), read by `meta_client.py`. The scripts live in `app/` beside the code; the copies
+here are byte-identical to the deployed ones.
+
+| Script | What it does |
+|---|---|
+| `read-loop.sh` | runs `reader.py` (8 threads) over every page that has figures and no read yet, then again every 3 min as SAM adds pages. Exits when `read/STOP` exists. `BUDGET` is a **total** in dollars: the reader sums the `cost_usd` of every file under `read/` and `ident/` before each call and stops at the limit. |
+| `restart-read-loop.sh` | the only safe way to start or restart the loop: stops the old loop and reader, removes the STOP file, starts a new loop with `BUDGET`. **Run it as a script file, never inline over ssh**: `pkill -f` would match the ssh command line that carries the pattern, and kill the ssh. |
+| `stop-api.sh` | the pause button: writes `read/STOP`, kills the loop, the reader and the identifier. SAM, the indexer and the search page keep running. |
+| `run-identify-all.sh` | `identify.py` over every book (`--skip-first 1`, so MoMA's record sheet is never shown; 4 threads), then `gold_moma.py`; writes `FINISHED` to `logs/gold-all.log`. It does **not** look at `read/STOP`: the identifier was resumed on its own while the reads stayed paused. |
+| `spend-guard.sh` | independent of the reader's own check: every 5 min it sums every `cost_usd` under `read/` and `ident/` into `logs/spend-total.txt` and, at `LIMIT` (98), runs the same stop as `stop-api.sh`. The glob is `ident/[0-9]*.json` so that `_gold_summary.json`, which repeats the identifier's total, is not counted twice. |
+
+```bash
+cd /srv/colophon
+setsid nohup bash app/spend-guard.sh > /dev/null 2>&1 < /dev/null &      # once, first
+BUDGET=75 bash app/restart-read-loop.sh                                  # reads, capped at $75 total
+setsid nohup bash app/run-identify-all.sh > /dev/null 2>&1 < /dev/null & # all 757 books, then the gold test
+bash app/stop-api.sh                                                     # pause everything that spends
+
+cat logs/spend-total.txt; tail -3 logs/spend-guard.log                   # what has been spent
+pgrep -af '[a]pp/reader.py|[a]pp/identify.py|[r]ead-loop|[r]un-identify' # what is spending now (bracket trick)
+tail -3 logs/reader.log logs/identify-all.log logs/gold-all.log
+```
+
+The third guard is the owner: the key can be deleted on dev.meta.ai at any time, and every script fails closed
+without it. What the run cost in the end: page reads **$16.31** for 2,915 pages (median 4.6 s per page), the
+identifier **$23.21** for 757 books (median 7.5 s per book), **$39.52** of the $100 cap. The two counts agreed with
+Meta's billing page to within a dollar.
+
+### Traps
+
+- **A pause by STOP file only stops the loop.** The identifier has its own launcher and ignores it; `stop-api.sh`
+  kills both. Check `pgrep` after a pause, never assume.
+- **`pkill -f` and `pgrep -f` match their own ssh command line.** That is why every kill lives in a script file and
+  every check uses the `[r]ead-loop` bracket pattern.
+- **Sum the files, not the log.** The reader's log counts what it sent; the files count what was answered and
+  costed. The guard and the budget both read the files.
