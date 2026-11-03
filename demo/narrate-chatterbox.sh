@@ -1,7 +1,7 @@
 #!/bin/bash
 # The voice-over: Chatterbox (mlx-community/Chatterbox-TTS-fp16 through mlx-audio) cloned from ref_kokoro.wav, a synthetic Kokoro sample.
 # One CLI run per piece (the model reloads each time), pieces joined with a 0.35 s breath, WAVs in tts/, lengths in tts/durations.json.
-cd "$(dirname "$0")"; V=${TTS_PYTHON:-python3}; mkdir -p pieces
+cd "$(dirname "$0")"; mkdir -p pieces; V=${TTS_PYTHON:-python3}   # a Python with mlx-audio installed (point TTS_PYTHON at a venv)
 python3 - <<'PY' > /tmp/cb_regen.tsv
 import json
 for k, parts in json.load(open("narration-pieces.json")).items():
