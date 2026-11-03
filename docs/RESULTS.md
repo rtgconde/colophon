@@ -36,8 +36,8 @@ boxes per prompt. The model is the SAM 3.1 Object Multiplex checkpoint (the fp16
 
 ## 2. Reading: Muse Spark 1.3 on the pages with figures
 
-The reads were capped by the budget, not finished: $75 was allowed for them and they were paused at $16.31 while the
-credits question was open. So the reader covered the oldest catalogues first (the queue is in year order).
+The reads were stopped at $16.31, not finished, so they cover the oldest catalogues first (the queue is in year
+order).
 
 | | |
 |---|---|

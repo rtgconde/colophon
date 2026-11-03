@@ -1,0 +1,17 @@
+{
+ "02_search": [
+  "Type what you remember. A woman reading a letter: Seurat's drawing, in MoMA's nineteen twenty-nine loan exhibition catalogue, page one twenty-five. The figure, the caption as printed, the record, and a link to the exact page of MoMA's own P.D.F.. Colophon did this for seven hundred and fifty-seven catalogues, seventy-seven thousand pages, with two Meta models."
+ ],
+ "03_sam": [
+  "First, SAM three point one finds every picture: paintings, photographs, drawings, prints, sculpture, maps, diagrams. It runs at home, on two DGX Sparks and a forty-ninety, about a page a second per machine. All seventy-seven thousand pages in five hours, zero failures: ninety-three thousand figures."
+ ],
+ "05_works": [
+  "A city street at night: Van Gogh's café terrace. And because the captions are read, not guessed, a work can be followed across catalogues. Picasso's Green Still Life, reproduced six times between nineteen thirty-one and nineteen thirty-six, each a different plate. Redon's Silence, five. Say-zann's Bathers, four. Which catalogue reproduced a work, and on which page: that index did not exist."
+ ],
+ "06_identifier": [
+  "The identifier reads a book's title page, copyright page and last pages, and returns a catalogue record with the page each field came from. Nothing is guessed: a field not printed comes back empty, with a note.",
+  "Every I.S.B.N. is checksum-tested, and a record is verified only when Open Library's title for it matches the title page.",
+  "Scored on all seven hundred and fifty-seven catalogues against MoMA's own record sheet, which the model never saw: title ninety-four percent, year ninety, publisher eighty-six, author eighty-five, I.S.B.N. ninety-two.",
+  "It even corrects MoMA. This brochure is dated nineteen eighty-seven on the sheet; the copyright line and the exhibition dates say two thousand and five."
+ ]
+}

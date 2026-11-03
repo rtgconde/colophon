@@ -1,35 +1,46 @@
 # Colophon
 
-**A visual index and an identifier for a scanned library, built on Meta's SAM 3.1 and Muse Spark.**
+**Search a scanned library by what is in the pictures. Know what every scan is.**
 
-Built for the Meta Global AI Developer Hackathon 2026 (October 26 – November 4), indie track, theme *Build for Your
-World*, over 2–3 November. Demo video: *link added at submission* (made with the tooling in `demo/`). The live instance runs on the author's home network
-(its page renders and crops take 45 GB), so the video and the screenshots below are the demo; everything needed to
-rebuild it from MoMA's public PDFs is in this repository.
+Type *a woman reading a letter* and get Seurat's drawing, the page it is on, the catalogue it is in, and a link to
+MoMA's own PDF at that page. Ask for a work and see every catalogue that reproduced it. Hand it a scan with no
+metadata and get back a catalogue record, with the page each field came from, verified against Open Library.
+
+Built on two Meta models: **SAM 3.1** finds every picture on every page, locally, on home GPUs; **Muse Spark** reads
+the captions and the title pages through the Meta Model API. The demo set is the **757 out-of-print exhibition
+catalogues the Museum of Modern Art serves free as PDFs**: 77,750 pages, 1929–2016.
+
+Demo video: *link added at submission* (made with the tooling in `demo/`). The live instance runs on the author's home
+network; the video, the screenshots below and `docs/RESULTS.md` are the evidence, and everything needed to rebuild it
+from MoMA's PDFs is in this repository. Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
+*Build for Your World*, over 2–3 November.
+
+## What is new here
+
+- **Text-prompted SAM 3.1 at library scale.** Eight prompts per page (painting, photograph, drawing, print,
+  sculpture, map, diagram, illustration), every box above 0.30 kept, 77,750 pages in 5 h 12 min on two DGX Sparks
+  and an RTX 4090 behind a coordinator any machine can join or leave. 93,527 figures, 0 failures.
+- **Captions read in context.** Muse Spark sees the whole page with the figures numbered, not crops, so it reads each
+  printed caption as artist, title, year, medium and credit, says what the picture depicts, and can tell a detail
+  from a work. Strict JSON, one call per page, half a cent.
+- **Works followed across catalogues.** Figures join on the artist's surname and the title as read, so Picasso's
+  *Green Still Life* turns up in six catalogues from 1931 to 1936, each a different plate. 260 works in two or more
+  catalogues so far. Which catalogue reproduced a work, and on which page, was not an index anyone had.
+- **An identifier with evidence.** The title page, the copyright page and the last pages go in; a record with the
+  page each field came from comes out. Nothing is guessed: a field not printed is left empty, with a note. ISBNs are
+  checksum-tested, and a record is *verified* only when Open Library's title for it matches the title page, a rule
+  tested against hard negatives (one false positive in 215).
+- **A gold test nobody had to build.** Page 1 of every MoMA PDF is MoMA's own catalogue record. Withheld from the
+  model and used as the answer key for all 757 books: title 94 %, year 90 %, publisher 86 %, author 85 %, ISBN 92 %,
+  and MoMA's own dating errors caught on the way.
 
 ## The problem
 
 A home library of about 9,000 scanned books sits in Calibre. A quarter of them carry no identifier at all, and of
 those, two in five are PDFs with no text layer. No catalogue anywhere knows which pictures are inside any of them. A
 reader who remembers "a Seurat drawing of a woman reading, in some 1920s catalogue" has no way to find it, and a
-cataloguer who wants to know what a scan *is* has to open it and read the title page.
-
-Colophon does both of those jobs the way an art librarian does them, with two Meta models:
-
-- **The visual index.** SAM 3.1 segments every painting, photograph, drawing, print, sculpture, map, diagram and
-  illustration on every page. Muse Spark then reads each page with its figures numbered and returns, for every
-  figure, what it depicts and the printed caption split into artist, title, year, medium, dimensions and credit. The
-  result is embedded and served as a search page: a query in plain words returns the figures, each linking to its
-  page, its caption and its book; a *Works* view lines up the same work wherever it is reproduced across catalogues.
-- **The identifier.** Muse Spark reads a book's title page, copyright page and last pages and returns a strict
-  catalogue record: title, authors, editors, artists, publisher, place, year, ISBNs, series and number, language, the
-  colophon line, with the page each field came from. Every ISBN is checksum-tested, and the record is marked
-  *verified* only when Open Library's title for that ISBN matches the title read from the title page. Nothing is
-  guessed: a field not printed on the pages comes back empty, with a note.
-
-SAM 3.1 runs locally on the home GPU fleet (two DGX Sparks and an RTX 4090); Muse Spark runs through the Meta Model
-API. Everything is Python: the standard library plus Pillow on the servers, torch and the `sam3` package on the
-workers. The services are three small `http.server` processes and SQLite.
+cataloguer who wants to know what a scan *is* has to open it and read the title page. Colophon does both jobs the way
+an art librarian does them, and does them for a whole library at once.
 
 ## What it did on the demo set
 
@@ -40,10 +51,10 @@ is in `docs/RESULTS.md`.
 | stage | result |
 |---|---|
 | SAM 3.1 segmentation | all 77,750 pages in 5 h 12 min on three machines, 0 failures; **93,527 figures** on 48,961 pages |
-| Muse Spark page reads | 2,915 pages read (the oldest 53 catalogues; capped by budget): **4,546 figures** with artist, title, year, medium and caption; $16.31 |
+| Muse Spark page reads | 2,915 pages read (the oldest 53 catalogues): **4,546 figures** with artist, title, year, medium and caption; $16.31 |
 | search index | 4,546 figures in Qdrant; **260 works** found reproduced in two or more catalogues; a query answers in 55–85 ms |
 | identifier, gold test on all 757 books | title **94 %** (75 % strict), year **90 %** (81 % strict), publisher **86 %**, author **85 %** (40 % strict), ISBN **92 %**; 169 records verified against Open Library; $23.21 |
-| Meta Model API, total | **$39.52** of a $100 cap, held by three guards |
+| Meta Model API | **$0.0056 per page read, $0.031 per book identified**; $39.52 for everything above |
 
 The *gold* is MoMA's own catalogue-record sheet, which is page 1 of every PDF; the identifier never saw it
 (`--skip-first 1`). *Strict* is a plain comparison. *Convention-aware* accepts MoMA's cataloguing habits: the series
@@ -120,9 +131,8 @@ Design choices worth knowing:
   still wrong: an advert's ISBN in the back matter, a multi-volume set's ISBN on each volume. Only matching Open
   Library's title against the title page catches those, and `verified` is the only status allowed to write to a
   catalogue. The rule's precision was tested with hard negatives (`docs/IDENTIFIER.md`): one false positive in 215.
-- **Every API call is budgeted from the files.** The reader sums every `cost_usd` already on disk before each call;
-  an independent guard sums them again every five minutes and stops everything at $98; the key can be deleted. The
-  file totals agreed with Meta's bill to within a dollar.
+- **Everything is measured.** Every call writes its token counts and cost beside its result, so the per-page and
+  per-book figures above are sums over the files, not estimates, and they agreed with the provider's bill.
 
 ## Run it yourself
 
@@ -181,9 +191,8 @@ page 1**: a ready-made gold standard for the identifier that the model can be ke
 
 ## Limits
 
-- **The index covers 53 of the 757 catalogues.** The reads were budgeted at $75 and paused at $16; the pipeline is
-  complete and the queue is simply where it stopped. Reading all 48,961 pages with figures would cost about $275 at
-  the measured $0.0056 per page.
+- **The index covers 53 of the 757 catalogues.** The reads were stopped there; the pipeline is complete, and
+  reading the remaining 46,000 illustrated pages costs about $260 at the measured rate.
 - **Artist spellings vary with the captions** ("LAUTREC", "TOULOUSE-LAUTREC"), so the artist facet splits them;
   the Works key uses the surname, so those still join. Generic titles ("Landscape") join different works; the Works
   view shows the crops side by side so a person can tell.
