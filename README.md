@@ -66,6 +66,11 @@ catalogue and the page. The facets are built from the hits.*
 *Works: the same painting wherever MoMA reproduced it, matched on the artist's surname and the title read from the
 captions. 260 works across the 53 catalogues read so far.*
 
+![What Muse Spark is sent: the page with its figures numbered](docs/img/reader-input.jpg)
+
+*What the reader sends: the page with every figure SAM found drawn and numbered, 17 of them here. The model
+answers with one record per number.*
+
 ![A page with its figure outlined](docs/img/page.jpg)
 
 *A hit opens its page with the figure outlined, the record Muse Spark read for it, and links to the PDF page at
@@ -205,6 +210,7 @@ docs/SEARCH.md       the index, the ranking, the page, the API
 docs/IDENTIFIER.md   the identifier, the verification rules and why, the gold test and the runs that shaped it
 docs/RESULTS.md      every number on the demo set
 docs/demo-set.csv    the 757 MoMA catalogues with their URLs
+docs/DEMO.md         the three-minute demo: script, shot list, the exact queries and commands
 ```
 
 No scans, page images, API keys or model weights are in the repository.
