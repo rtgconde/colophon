@@ -1,0 +1,21 @@
+# Colophon search page + API on :8102 (stdlib http.server).
+# Install: sudo install -m 644 colophon-serve.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          && sudo systemctl enable --now colophon-serve                  (docs/SEARCH.md)
+[Unit]
+Description=Colophon search server (:8102)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=colophon
+Group=colophon
+WorkingDirectory=/srv/colophon
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/home/colophon/.config/colophon/meta.env
+ExecStart=/home/colophon/.venvs/colophon/bin/python /srv/colophon/app/serve.py --root /srv/colophon --port 8102
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

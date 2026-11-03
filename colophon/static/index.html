@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colophon</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/theme.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/">Colophon</a>
+  <nav class="tabs" role="tablist">
+    <button data-tab="search" class="on">Search</button>
+    <button data-tab="works">Works</button>
+    <button data-tab="books">Catalogues</button>
+  </nav>
+  <button class="theme" id="theme" aria-label="Switch theme">◐</button>
+</header>
+<div class="wrap">
+  <section id="tab-search">
+    <form class="search" id="form" role="search">
+      <input id="q" type="search" autocomplete="off" placeholder="Describe a picture: a woman reading a letter, a water tower…" aria-label="Search figures">
+      <button type="submit">Search</button>
+    </form>
+    <p class="hint" id="stats">Every figure read from MoMA's scanned exhibition catalogues.</p>
+    <div class="layout">
+      <aside class="facets" id="facets"></aside>
+      <div><p class="status" id="status"></p><div class="grid" id="grid"></div></div>
+    </div>
+  </section>
+  <section id="tab-works" hidden>
+    <p class="status" id="works-status"></p>
+    <div class="works" id="works"></div>
+  </section>
+  <section id="tab-books" hidden>
+    <p class="status" id="books-status"></p>
+    <div class="books" id="books"></div>
+  </section>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

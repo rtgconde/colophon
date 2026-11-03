@@ -1,0 +1,23 @@
+# Colophon search index: embeds every read figure (bge-m3 on mlbox) into Qdrant colophon_figures, every 2 min.
+# Install: sudo install -m 644 colophon-index.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          && sudo systemctl enable --now colophon-index                  (docs/SEARCH.md)
+[Unit]
+Description=Colophon search index (read/ -> Qdrant colophon_figures, every 2 min)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=colophon
+Group=colophon
+WorkingDirectory=/srv/colophon
+Environment=PYTHONUNBUFFERED=1
+# QDRANT_API_KEY; the script also reads this file itself
+EnvironmentFile=-/home/colophon/.config/colophon/meta.env
+ExecStart=/home/colophon/.venvs/colophon/bin/python /srv/colophon/app/index.py --root /srv/colophon --loop
+Restart=on-failure
+RestartSec=15
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
