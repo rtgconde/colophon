@@ -39,8 +39,8 @@ def search1(page):   # the opening: one query, the first hit, the page view, the
 def search2(page):   # the second query, then the Works tab, slowly
     page.goto(BASE + "/"); page.wait_for_timeout(600)
     page.click("#q"); page.type("#q", "a city street at night", delay=55); page.keyboard.press("Enter")
-    page.wait_for_selector(".grid .card"); page.wait_for_timeout(1500)
-    hover_cards(page, 2, 1100)
+    page.wait_for_selector(".grid .card"); page.wait_for_timeout(3200)      # let the lazy thumbnails land
+    hover_cards(page, 2, 1200)
     tab = page.locator('.tabs button[data-tab="works"]'); bb = tab.bounding_box()
     page.mouse.move(bb["x"]+bb["width"]/2, bb["y"]+bb["height"]/2, steps=20); page.wait_for_timeout(300); tab.click()
     page.wait_for_selector(".works .work"); page.wait_for_timeout(2500)
