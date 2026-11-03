@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Gold test for the identifier: compare ident/<id>.json with Calibre's record for the same MoMA books.
+
+Page 1 of every MoMA catalogue PDF is MoMA's own catalogue-record sheet, and an earlier import copied it into Calibre,
+so Calibre's record is the gold standard. Run identify.py with --skip-first 1 first, so the model never sees that sheet.
+
+Two ways to get the gold:
+  - on hub, read Calibre directly (default --lib /mnt/nas/Books; WAL-safe temp copy);
+  - anywhere else, pass --gold gold.json, written on hub by --dump-gold:
+
+    gold_moma.py --root /srv/colophon --dump-gold /srv/colophon/ident/_gold.json      # on hub
+    gold_moma.py --root /srv/colophon [--books 13238,13443] [--sample 20] [--gold FILE]
+
+Fields compared after normalisation: title (main title; a subtitle on either side is optional), year (4 digits),
+publisher (MoMA name variants collapse to one), first author (surname + first initial, either order), ISBN (any
+overlap, ISBN-10 and -13 are the same book). When Calibre's author is MoMA itself (the placeholder for "no person
+named") the author field is reported as gold_corporate and not scored. A field empty on both sides is "both_empty" and not scored; empty in gold
+but read by the model is "extra" (not an error, reported); read wrong or missed is a mismatch.
+Summary → <root>/ident/_gold_summary.json.
+"""
+import argparse, glob, json, os, random, re, shutil, sqlite3, sys, tempfile, unicodedata
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from verify import isbn_norm, to_isbn13  # noqa: E402
+
+FIELDS = ["title", "year", "publisher", "author", "isbn"]
+
+
+# ---------- gold from Calibre ----------
+
+def read_calibre(lib, ids):
+    tmp = tempfile.mkdtemp(prefix="colophon-gold-")
+    try:
+        for suf in ("", "-wal", "-shm"):
+            src = os.path.join(lib, "metadata.db" + suf)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(tmp, "metadata.db" + suf))
+        c = sqlite3.connect(os.path.join(tmp, "metadata.db"))
+        out = {}
+        for bid in ids:
+            row = c.execute("select title, pubdate from books where id=?", (bid,)).fetchone()
+            if not row:
+                continue
+            authors = [r[0] for r in c.execute(
+                "select a.name from books_authors_link l join authors a on a.id=l.author where l.book=? order by l.id",
+                (bid,))]
+            pub = c.execute("select p.name from books_publishers_link l join publishers p on p.id=l.publisher "
+                            "where l.book=?", (bid,)).fetchone()
+            isbns = [r[0] for r in c.execute("select val from identifiers where book=? and type='isbn'", (bid,))]
+            out[str(bid)] = {"title": row[0], "year": (row[1] or "")[:4], "authors": authors,
+                             "publisher": pub[0] if pub else "", "isbns": isbns}
+        c.close()
+        return out
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ---------- normalisation ----------
+
+def fold(s):
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch)).lower()
+    s = s.replace("&", " and ")
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return " ".join(s.split())
+
+
+def norm_title(t):
+    t = fold(t)
+    t = re.sub(r"^(the|a|an) ", "", t)
+    return t
+
+
+def title_eq(gold, read, read_sub=""):
+    g = norm_title(gold)
+    variants = {norm_title(read), norm_title(f"{read}: {read_sub}") if read_sub else norm_title(read)}
+    gm = norm_title(re.split(r"[:;]", gold, maxsplit=1)[0])
+    rm = norm_title(re.split(r"[:;]", read or "", maxsplit=1)[0])
+    return bool(g) and (g in variants or gm in variants or rm == gm or g == rm)
+
+
+MOMA_RE = re.compile(r"\b(museum of modern art|moma)\b")
+
+
+def norm_publisher(p):
+    f = fold(p)
+    if MOMA_RE.search(f):
+        return "museum of modern art"
+    f = re.sub(r"\b(inc|ltd|co|company|publishers?|publishing|press|books|new york|london|ny)\b", " ", f)
+    return " ".join(f.split())
+
+
+def norm_year(y):
+    m = re.search(r"\b(1[5-9]\d\d|20\d\d)\b", y or "")
+    return m.group(1) if m else ""
+
+
+def author_key(name):
+    """'Barr, Alfred H.' / 'Alfred H. Barr, Jr.' → 'barr a'."""
+    n = name or ""
+    n = re.sub(r",?\s*\b(jr|sr|ii|iii|ph\.?d)\b\.?", "", n, flags=re.I)
+    if "," in n:
+        last, first = n.split(",", 1)
+    else:
+        parts = n.split()
+        if not parts:
+            return ""
+        last, first = parts[-1], " ".join(parts[:-1])
+    last, first = fold(last), fold(first)
+    return f"{last} {first[:1]}".strip()
+
+
+def isbn_set(lst):
+    s = set()
+    for x in lst or []:
+        n = isbn_norm(x)
+        if n:
+            s.add(to_isbn13(n) or n)
+    return s
+
+
+# ---------- comparison ----------
+
+def compare(gold, rec):
+    res = {}
+    # title
+    res["title"] = ("ok" if title_eq(gold["title"], rec.get("title", ""), rec.get("subtitle", "")) else "wrong",
+                    gold["title"], " : ".join(x for x in (rec.get("title", ""), rec.get("subtitle", "")) if x))
+    # year
+    gy, ry = norm_year(gold["year"]), norm_year(rec.get("year", ""))
+    res["year"] = (_cmp(gy, ry, gy == ry), gy, ry)
+    # publisher
+    gp, rp = norm_publisher(gold["publisher"]), norm_publisher(rec.get("publisher", ""))
+    res["publisher"] = (_cmp(gp, rp, gp == rp), gold["publisher"], rec.get("publisher", ""))
+    # first author (gold) vs any author/editor the model read
+    g0 = gold["authors"][0] if gold["authors"] else ""
+    read_people = (rec.get("authors") or []) + (rec.get("editors") or [])
+    if MOMA_RE.search(fold(g0)):
+        # Calibre carries MoMA as the author when the record sheet names no person: a corporate placeholder, not scored
+        res["author"] = ("gold_corporate", gold["authors"][:1], read_people[:3])
+        gi, ri = isbn_set(gold["isbns"]), isbn_set(rec.get("isbns"))
+        res["isbn"] = (_cmp(gi, ri, bool(gi & ri)), sorted(gi), sorted(ri))
+        return res
+    ga = author_key(g0) if g0.lower() != "unknown" else ""
+    rk = [author_key(x) for x in read_people]
+    first_ok = bool(ga) and bool(rk) and rk[0] == ga
+    any_ok = bool(ga) and ga in rk
+    res["author"] = (_cmp(ga, rk[0] if rk else "", first_ok), gold["authors"][:1], read_people[:3])
+    if res["author"][0] == "wrong" and any_ok:
+        res["author"] = ("ok_not_first",) + res["author"][1:]
+    # isbn
+    gi, ri = isbn_set(gold["isbns"]), isbn_set(rec.get("isbns"))
+    res["isbn"] = (_cmp(gi, ri, bool(gi & ri)), sorted(gi), sorted(ri))
+    return res
+
+
+def _cmp(g, r, eq):
+    if not g and not r:
+        return "both_empty"
+    if not g:
+        return "extra"
+    if not r:
+        return "missed"
+    return "ok" if eq else "wrong"
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default="/srv/colophon")
+    ap.add_argument("--lib", default="/mnt/nas/Books")
+    ap.add_argument("--gold", help="gold JSON written by --dump-gold (else read Calibre at --lib)")
+    ap.add_argument("--dump-gold", metavar="OUT", help="write gold for every book in books.json (or --books) and exit")
+    ap.add_argument("--books", default="")
+    ap.add_argument("--sample", type=int, default=0, help="compare a random sample of N identified books")
+    ap.add_argument("--seed", type=int, default=1)
+    a = ap.parse_args()
+
+    if a.dump_gold:
+        ids = [int(x) for x in a.books.split(",")] if a.books else [b["id"] for b in json.load(open(f"{a.root}/books.json"))]
+        gold = read_calibre(a.lib, ids)
+        with open(a.dump_gold, "w") as f:
+            json.dump(gold, f, ensure_ascii=False, indent=1)
+        print(f"gold for {len(gold)} books -> {a.dump_gold}")
+        return
+
+    idents = {}
+    for p in glob.glob(f"{a.root}/ident/*.json"):
+        b = os.path.basename(p)[:-5]
+        if b.isdigit():
+            idents[b] = json.load(open(p))
+    if a.books:
+        want = set(a.books.split(","))
+        idents = {k: v for k, v in idents.items() if k in want}
+    idents = {k: v for k, v in idents.items() if v.get("ok", True) and v.get("record")}
+    keys = sorted(idents, key=int)
+    if a.sample and len(keys) > a.sample:
+        random.seed(a.seed)
+        keys = sorted(random.sample(keys, a.sample), key=int)
+    if not keys:
+        sys.exit("no identified books to compare")
+    gold = json.load(open(a.gold)) if a.gold else read_calibre(a.lib, [int(k) for k in keys])
+
+    tally = {f: {} for f in FIELDS}
+    rows = []
+    skipped_first = set()
+    for k in keys:
+        if k not in gold:
+            print(f"{k}: not in gold, skipped")
+            continue
+        rec = idents[k]["record"]
+        skipped_first.add(idents[k].get("skip_first"))
+        res = compare(gold[k], rec)
+        for f in FIELDS:
+            tally[f][res[f][0]] = tally[f].get(res[f][0], 0) + 1
+        rows.append({"id": int(k), "status": (idents[k].get("verification") or {}).get("status"),
+                     "fields": {f: {"result": res[f][0], "gold": res[f][1], "read": res[f][2]} for f in FIELDS}})
+
+    acc = {}
+    for f in FIELDS:
+        t = tally[f]
+        scored = t.get("ok", 0) + t.get("ok_not_first", 0) + t.get("wrong", 0) + t.get("missed", 0)
+        right = t.get("ok", 0) + (t.get("ok_not_first", 0) if f == "author" else 0)
+        acc[f] = {"right": right, "scored": scored, "accuracy": round(right / scored, 3) if scored else None, **t}
+
+    print(f"\nGold test over {len(rows)} books (skip_first={sorted(x for x in skipped_first if x is not None)})")
+    print(f"{'field':10} {'right/scored':>13} {'acc':>6}  detail")
+    for f in FIELDS:
+        x = acc[f]
+        det = " ".join(f"{k}={v}" for k, v in x.items() if k not in ("right", "scored", "accuracy"))
+        a_ = f"{x['accuracy']:.0%}" if x["accuracy"] is not None else "-"
+        print(f"{f:10} {x['right']:>6}/{x['scored']:<6} {a_:>6}  {det}")
+    print("\nMismatches:")
+    for r in rows:
+        bad = {f: v for f, v in r["fields"].items() if v["result"] in ("wrong", "missed", "ok_not_first", "extra",
+                                                                         "gold_corporate")}
+        for f, v in bad.items():
+            print(f"  {r['id']:>6} {f:9} {v['result']:12} gold={v['gold']!r}  read={v['read']!r}")
+    summary = {"books": len(rows), "accuracy": acc, "rows": rows,
+               "skip_first": sorted(x for x in skipped_first if x is not None),
+               "verification": _count(r["status"] for r in rows)}
+    os.makedirs(f"{a.root}/ident", exist_ok=True)
+    with open(f"{a.root}/ident/_gold_summary.json", "w") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=1)
+    print(f"\nverification: {summary['verification']}\nsummary -> {a.root}/ident/_gold_summary.json")
+
+
+def _count(it):
+    d = {}
+    for x in it:
+        d[str(x)] = d.get(str(x), 0) + 1
+    return d
+
+
+if __name__ == "__main__":
+    main()
