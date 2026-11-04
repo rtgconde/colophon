@@ -1,6 +1,7 @@
 # The public copy
 
-<https://colophon-natural-analytics.vercel.app> is Colophon without the machines that made it: a frozen snapshot of
+<https://colophon.rconde.tech> (also <https://colophon-natural-analytics.vercel.app>) is Colophon without the machines
+that made it: a frozen snapshot of
 everything Muse Spark read (284 catalogues, 22,297 pages, 45,489 figures, 795 works in two or more catalogues),
 served from Vercel with the images on Cloudflare R2. It exists so a reader of the repository can use the thing the
 video shows without rebuilding the pipeline. Nothing on it reaches the home network.
