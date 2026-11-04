@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colophon</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/theme.js"></script>
+<style>
+  .pv-img { position: relative; }
+  .pv-img .boxes { position: absolute; inset: 0; }
+  .pv-img .box { position: absolute; display: block; border: 2px solid rgba(120, 120, 120, .75); box-sizing: border-box; }
+  .pv-img .box.on { border: 3px solid var(--accent); }
+  .pv-img .box:hover { border-color: var(--fg); }
+</style>
+</head>
+<body class="pageview">
+<header class="bar"><a class="brand" href="/">Colophon</a>
+<button class="theme" id="theme" aria-label="Theme">◐</button></header>
+<main class="pv" id="pv"><p class="status" id="status">Loading…</p></main>
+<script>
+// /page/<book>/<nnnn>?k=<figure>: the page render with every figure boxed (the chosen one in the accent colour),
+// that figure's record as Muse Spark read it, the printed caption, the source links, the neighbouring pages.
+(function () {
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var m = location.pathname.match(/^\/page\/(\d+)\/(\d+)/);
+  var k = parseInt(new URLSearchParams(location.search).get('k') || '0', 10) || 0;
+  var pv = document.getElementById('pv');
+  if (!m) { pv.innerHTML = '<p class="status">No such page.</p>'; return; }
+  var book = m[1], page = parseInt(m[2], 10);
+  var pad = function (n) { return ('000' + n).slice(-4); };
+
+  fetch('/api/page?book=' + book + '&page=' + page).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.error) { pv.innerHTML = '<p class="status">' + esc(d.error) + '</p>'; return; }
+    var b = d.book, p = d.page, figs = d.figures || [];
+    var rec = figs.filter(function (f) { return f.k === k; })[0] || {};
+    document.title = (rec.title || rec.depicts || 'Figure ' + k).slice(0, 80) + ' · Colophon';
+    var boxes = '';
+    if (p.width && p.height) {
+      boxes = figs.filter(function (f) { return f.box; }).map(function (f) {
+        var x = f.box[0] / p.width * 100, y = f.box[1] / p.height * 100,
+            w = (f.box[2] - f.box[0]) / p.width * 100, h = (f.box[3] - f.box[1]) / p.height * 100;
+        return '<a class="box' + (f.k === k ? ' on' : '') + '" href="?k=' + f.k + '" title="figure ' + f.k + '" style="left:' +
+          x.toFixed(2) + '%;top:' + y.toFixed(2) + '%;width:' + w.toFixed(2) + '%;height:' + h.toFixed(2) + '%"></a>';
+      }).join('');
+    }
+    var fields = [['Artist', rec.artist], ['Title', rec.title], ['Year', rec.year], ['Medium', rec.medium],
+      ['Dimensions', rec.dimensions], ['Credit', rec.credit], ['Kind', rec.kind], ['Detail', rec.is_detail ? 'yes' : ''],
+      ['Depicts', rec.depicts], ['Notes', rec.notes]];
+    var dl = fields.filter(function (f) { return f[1]; }).map(function (f) {
+      return '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; }).join('');
+    var nb = d.works && d.works[String(k)];
+    var work = nb ? '<p class="work">Reproduced in <a href="/#work?' +
+      new URLSearchParams({ artist: rec.artist || '', title: rec.title || '' }).toString() + '">' + nb + ' catalogues</a></p>' : '';
+    var links = '<li>Calibre book id <code>' + esc(b.id) + '</code></li>';
+    if (d.links && d.links.moma_pdf) {
+      links += '<li><a href="' + esc(d.links.moma_pdf) + '" rel="noopener">MoMA PDF, page ' + page + '</a> (the full-resolution scan)</li>' +
+        '<li><a href="' + esc(d.links.moma_exhibition) + '" rel="noopener">MoMA exhibition ' + esc(b.moma) + '</a></li>';
+    }
+    var others = figs.filter(function (f) { return f.k !== k; }).map(function (f) {
+      return '<a href="?k=' + f.k + '">figure ' + f.k + '</a>'; }).join(' ');
+    var nav = [];
+    if (d.prev != null) nav.push('<a href="/page/' + book + '/' + pad(d.prev) + '?k=0">← previous page</a>');
+    if (d.next != null) nav.push('<a href="/page/' + book + '/' + pad(d.next) + '?k=0">next page →</a>');
+    pv.innerHTML =
+      '<figure class="pv-img"><img src="' + esc(p.image) + '" alt="Page ' + page + ' of ' + esc(b.title) + ', figure ' + k + ' outlined">' +
+      '<div class="boxes">' + boxes + '</div></figure>' +
+      '<section class="pv-rec">' +
+      '<p class="eyebrow">' + esc(b.title) + (b.year ? ', ' + esc(b.year) : '') + ' · page ' + page + ' · figure ' + k + '</p>' +
+      '<h1>' + esc(rec.title || 'Untitled figure') + '</h1>' +
+      '<p class="by">' + esc(rec.artist || '') + '</p>' + work + '<dl>' + dl + '</dl>' +
+      (rec.caption_text ? '<h2>Caption as printed</h2><pre class="cap">' + esc(rec.caption_text) + '</pre>' : '') +
+      '<h2>Source</h2><ul class="links">' + links + '</ul>' +
+      (others ? '<p class="others">Also on this page: ' + others + '</p>' : '') +
+      '<p class="pnav">' + nav.join(' · ') + '</p>' +
+      '<p class="meta">page kind: ' + esc(p.page_kind || '?') + ' · read by ' + esc(p.model || '?') +
+      ' · <a href="/#book=' + esc(b.id) + '">all figures in this catalogue</a></p>' +
+      '</section>';
+  }).catch(function (e) { pv.innerHTML = '<p class="status">Failed: ' + esc(e) + '</p>'; });
+})();
+</script>
+</body>
+</html>

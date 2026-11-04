@@ -19,3 +19,5 @@ __pycache__/
 ._*
 # the rendered demo video (43 MB) stays out of git
 demo/*.mp4
+.vercel/
+web/.vercel/

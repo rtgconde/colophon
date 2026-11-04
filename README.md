@@ -13,7 +13,12 @@ catalogues the Museum of Modern Art serves free as PDFs**: 77,750 pages, 1929–
 Demo video: <https://youtu.be/BdbA1Wr3TI0> (made with the tooling in `demo/`; recorded on 2026-11-03, when 53
 catalogues had been read, so the counts on screen are lower than the final ones in the table below). The live instance runs on the author's home
 network; the video, the screenshots below and `docs/RESULTS.md` are the evidence, and everything needed to rebuild it
-from MoMA's PDFs is in this repository. Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
+from MoMA's PDFs is in this repository.
+
+**Live demo: <https://colophon-natural-analytics.vercel.app>** — a public copy of everything Muse Spark read (284
+catalogues, 22,297 pages, 45,489 figures): the search, the works reproduced across catalogues, the catalogue list and
+the page view with every figure boxed. It is a frozen snapshot served from Vercel with the images on R2 (`web/`), and
+its search is keyword search over the records; the semantic search in the video needs the local embedder and index. Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
 *Build for Your World*, over 2–3 November.
 
 ## What is new here
@@ -224,6 +229,7 @@ docs/RESULTS.md      every number on the demo set
 docs/demo-set.csv    the 757 MoMA catalogues with their URLs
 docs/DEMO.md         the three-minute demo: script, shot list, the exact queries and commands
 demo/                how the demo video was made from the live instance (Playwright, Kokoro, ffmpeg)
+web/                 the public copy on Vercel: the snapshot export, the web-sized images, the API and the pages
 ```
 
 No scans, page images, API keys or model weights are in the repository.

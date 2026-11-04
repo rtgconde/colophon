@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/api/:fn(search|work|works|books|stats|page)", "destination": "/api/index?fn=:fn" },
+    { "source": "/page/:book(\\d+)/:page(\\d+)", "destination": "/page.html" }
+  ],
+  "headers": [
+    { "source": "/static/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }
+  ]
+}
