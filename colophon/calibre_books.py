@@ -32,13 +32,21 @@ def main():
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(tmp, "metadata.db" + suf))
     c = sqlite3.connect(os.path.join(tmp, "metadata.db"))
-    rows = c.execute(
-        """select b.id, b.title, b.path, d.name, b.pubdate,
-                  (select val from identifiers where book=b.id and type=?) as ident,
-                  (select val from identifiers where book=b.id and type=?) as ident_doc
-           from books b join data d on d.book=b.id
-           where d.format='PDF' and b.id in (select book from identifiers where type=?)
-           order by b.id""", (a.ident, a.ident + "-doc", a.ident)).fetchall()
+    if a.ident == "none":
+        # the books with no identifier of any kind: the set the identifier exists to fix
+        rows = c.execute(
+            """select b.id, b.title, b.path, d.name, b.pubdate, null, null
+               from books b join data d on d.book=b.id
+               where d.format='PDF' and b.id not in (select book from identifiers)
+               order by b.id""").fetchall()
+    else:
+        rows = c.execute(
+            """select b.id, b.title, b.path, d.name, b.pubdate,
+                      (select val from identifiers where book=b.id and type=?) as ident,
+                      (select val from identifiers where book=b.id and type=?) as ident_doc
+               from books b join data d on d.book=b.id
+               where d.format='PDF' and b.id in (select book from identifiers where type=?)
+               order by b.id""", (a.ident, a.ident + "-doc", a.ident)).fetchall()
     c.close()
     shutil.rmtree(tmp, ignore_errors=True)
     books = []

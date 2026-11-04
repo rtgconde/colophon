@@ -130,7 +130,7 @@ def identify(client, root, book, a):
         jpg, size = load_jpeg(f"{root}/pages/{book['id']}/{p:04d}.jpg", a.long_side)
         sizes.append(size)
         parts += [text_part(f"Image {i} (page {p}):"), image_part(data=jpg)]
-    messages = [{"role": "developer", "content": DEVELOPER}, {"role": "user", "content": parts}]
+    messages = [{"role": "developer", "content": DEVELOPER + a.system_suffix}, {"role": "user", "content": parts}]
     base = {"book": book["id"], "pages_sent": pages, "verso_pages_added": extra, "skip_first": a.skip_first, "long_side": a.long_side,
             "provider": a.provider}
     t0 = time.time()
@@ -172,6 +172,8 @@ def main():
     ap.add_argument("--base-url")
     ap.add_argument("--model")
     ap.add_argument("--timeout", type=int, default=0, help="per-call HTTP timeout (default 240 s, 900 s for local)")
+    ap.add_argument("--system-suffix", default="",
+                    help="text appended to the developer prompt (e.g. a local model's reasoning-strength line)")
     ap.add_argument("--no-lookup", action="store_true", help="checksums only, no OpenLibrary")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--reverify", action="store_true", help="re-run verify() on existing ok outputs; no model calls")
