@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Colophon</title>
+<meta property="og:title" content="Colophon">
+<meta property="og:description" content="A page from one of MoMA's exhibition catalogues, with the figure Muse Spark read outlined and its record beside it.">
+<meta property="og:image" content="https://colophon.rconde.tech/static/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/theme.js"></script>
 <style>
@@ -53,11 +58,12 @@
     var nb = d.works && d.works[String(k)];
     var work = nb ? '<p class="work">Reproduced in <a href="/#work?' +
       new URLSearchParams({ artist: rec.artist || '', title: rec.title || '' }).toString() + '">' + nb + ' catalogues</a></p>' : '';
-    var links = '<li>Calibre book id <code>' + esc(b.id) + '</code></li>';
+    var links = '';
     if (d.links && d.links.moma_pdf) {
-      links += '<li><a href="' + esc(d.links.moma_pdf) + '" rel="noopener">MoMA PDF, page ' + page + '</a> (the full-resolution scan)</li>' +
-        '<li><a href="' + esc(d.links.moma_exhibition) + '" rel="noopener">MoMA exhibition ' + esc(b.moma) + '</a></li>';
+      links = '<p class="src"><a class="btn" href="' + esc(d.links.moma_pdf) + '" rel="noopener">Open the scan at MoMA, page ' + page + '</a>' +
+        '<a href="' + esc(d.links.moma_exhibition) + '" rel="noopener">the exhibition</a></p>';
     }
+    links += '<p class="meta">Calibre book id ' + esc(b.id) + '</p>';
     var others = figs.filter(function (f) { return f.k !== k; }).map(function (f) {
       return '<a href="?k=' + f.k + '">figure ' + f.k + '</a>'; }).join(' ');
     var nav = [];
@@ -71,7 +77,7 @@
       '<h1>' + esc(rec.title || 'Untitled figure') + '</h1>' +
       '<p class="by">' + esc(rec.artist || '') + '</p>' + work + '<dl>' + dl + '</dl>' +
       (rec.caption_text ? '<h2>Caption as printed</h2><pre class="cap">' + esc(rec.caption_text) + '</pre>' : '') +
-      '<h2>Source</h2><ul class="links">' + links + '</ul>' +
+      '<h2>Source</h2>' + links +
       (others ? '<p class="others">Also on this page: ' + others + '</p>' : '') +
       '<p class="pnav">' + nav.join(' · ') + '</p>' +
       '<p class="meta">page kind: ' + esc(p.page_kind || '?') + ' · read by ' + esc(p.model || '?') +

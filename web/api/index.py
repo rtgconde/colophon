@@ -247,7 +247,25 @@ def page(q):
             "figures": figs, "works": nb, "prev": prev, "next": nxt, "links": links_for(b, pg)}
 
 
-ROUTES = {"search": search, "work": work, "works": works, "books": books, "stats": stats, "page": page}
+# The opening grid: two dozen figures picked by eye from the works that recur across catalogues, mixing colour
+# plates, halftones, photographs, posters, sculpture and architecture. (book, page, k).
+SAMPLE = [(13244, 74, 0), (13449, 17, 0), (13245, 250, 0), (13402, 15, 0), (13448, 204, 0), (13439, 115, 1),
+          (13300, 48, 0), (13342, 281, 0), (13385, 21, 0), (13255, 42, 0), (13289, 134, 0), (13696, 132, 0),
+          (13386, 124, 0), (13346, 23, 0), (13329, 70, 0), (13335, 242, 0), (13696, 97, 0), (13362, 690, 0),
+          (13261, 81, 0), (13261, 274, 0), (13241, 57, 0), (13245, 90, 0), (13370, 14, 0), (13238, 11, 0)]
+
+
+def sample(q):
+    hits = []
+    for b, p, k in SAMPLE:
+        r = db().execute("SELECT payload FROM figures WHERE book=? AND page=? AND k=?", (b, p, k)).fetchone()
+        if r:
+            hits.append(hit_json(json.loads(r["payload"])))
+    return {"hits": hits}
+
+
+ROUTES = {"search": search, "work": work, "works": works, "books": books, "stats": stats, "page": page,
+          "sample": sample}
 
 
 class handler(BaseHTTPRequestHandler):

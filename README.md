@@ -18,7 +18,9 @@ from MoMA's PDFs is in this repository.
 **Live demo: <https://colophon.rconde.tech>** — a public copy of everything Muse Spark read (284
 catalogues, 22,297 pages, 45,489 figures): the search, the works reproduced across catalogues, the catalogue list and
 the page view with every figure boxed. It is a frozen snapshot served from Vercel with the images on R2 (`web/`), and
-its search is keyword search over the records; the semantic search in the video needs the local embedder and index. Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
+its search is keyword search over the records; the semantic search in the video needs the local embedder and index.
+
+![The public copy: the opening page](docs/img/home.jpg) Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
 *Build for Your World*, over 2–3 November.
 
 ## What is new here

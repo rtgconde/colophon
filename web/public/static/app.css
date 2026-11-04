@@ -119,3 +119,37 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .pv { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 18px; }
   .pv-rec dl { grid-template-columns: 90px minmax(0, 1fr); }
 }
+
+/* the public copy: opening state, chips, how-it-works, footer, decades, buttons */
+.lede { margin: 26px 0 18px; max-width: 880px; }
+.lede h1 { font: 600 34px/1.15 var(--serif); letter-spacing: -.01em; margin: 0 0 10px; }
+.lede-p { font-size: 16px; line-height: 1.5; color: var(--muted); margin: 0; }
+.lede-p a { color: var(--fg); }
+.chips { margin: 12px 4px 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.chips a { text-decoration: none; color: var(--fg); border: 1px solid var(--line); border-radius: 16px; padding: 4px 11px; }
+.chips a:hover { border-color: var(--fg); }
+body.home .layout { grid-template-columns: minmax(0, 1fr); }
+body.home .facets { display: none; }
+body.home .status { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: .06em; margin-top: 10px; }
+.none { color: var(--muted); max-width: 600px; }
+.how { margin: 56px 0 0; padding-top: 24px; border-top: 1px solid var(--line); max-width: 880px; }
+.how h2 { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 14px; }
+.how ol { margin: 0; padding-left: 22px; }
+.how li { margin: 0 0 8px; line-height: 1.5; }
+.how li a { color: var(--fg); }
+.how .links { margin: 16px 0 0; color: var(--muted); font-size: 13px; }
+.how .links a { color: var(--fg); }
+.foot { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 880px; }
+.decade { grid-column: 1 / -1; font: 600 20px/1.2 var(--serif); margin: 22px 0 2px; }
+.decade:first-child { margin-top: 0; }
+.decade span { font: 400 13px/1 var(--sans); color: var(--muted); margin-left: 8px; }
+.btn { display: inline-block; text-decoration: none; background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 20px; font-weight: 500; font-size: 14px; }
+.btn:hover { opacity: .85; }
+.pv-rec .src { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; }
+.pv-rec .src a:not(.btn) { color: var(--accent); }
+@media (max-width: 760px) {
+  .lede { margin: 14px 0 12px; }
+  .lede h1 { font-size: 24px; }
+  .lede-p { font-size: 14px; }
+  .how { margin-top: 36px; }
+}

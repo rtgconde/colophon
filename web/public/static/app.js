@@ -1,6 +1,7 @@
 // Colophon search page, the public copy. Same page as colophon/static/app.js on the hub; the differences are that
-// image URLs come from the API (they live on the media host), the search is keyword search over the records, and
-// the catalogue list is a snapshot. State lives in the URL hash so results can be shared and the back button works:
+// image URLs come from the API (they live on the media host), the search is keyword search over the records, the
+// catalogue list is a snapshot, and with nothing searched the page opens on a hand-picked grid. State lives in the
+// URL hash so results can be shared and the back button works:
 //   #q=<text>&kind=&artist=&book=     search (empty q = browse the filtered set)
 //   #works                            works reproduced in 2+ catalogues
 //   #work?artist=&title=              one work across catalogues
@@ -11,7 +12,7 @@
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var fmt = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
   var state = { q: '', kind: '', artist: '', book: '' };
-  var lastHits = [], seq = 0;
+  var lastHits = [], seq = 0, sampleHtml = null;
 
   function getJSON(url) { return fetch(url).then(function (r) { return r.json(); }); }
 
@@ -56,9 +57,30 @@
     return '#' + p.toString();
   }
 
+  function setHome(on) {
+    $('lede').hidden = !on;
+    $('how').hidden = !on;
+    $('chips').hidden = !on;
+    document.body.classList.toggle('home', on);
+  }
+
+  function showSample() {
+    var my = ++seq;
+    setHome(true);
+    $('facets').innerHTML = '';
+    $('status').textContent = 'A few places to start';
+    if (sampleHtml) { $('grid').innerHTML = sampleHtml; return; }
+    getJSON('/api/sample').then(function (r) {
+      if (my !== seq) return;
+      sampleHtml = (r.hits || []).map(card).join('');
+      $('grid').innerHTML = sampleHtml;
+    }).catch(function () {});
+  }
+
   function search() {
     var my = ++seq, p = new URLSearchParams({ limit: 60 });
     ['q', 'kind', 'artist', 'book'].forEach(function (k) { if (state[k]) p.set(k, state[k]); });
+    setHome(false);
     $('status').textContent = 'Searching…';
     getJSON('/api/search?' + p.toString()).then(function (r) {
       if (my !== seq) return;
@@ -69,7 +91,9 @@
       $('status').textContent = lastHits.length + ' figures' + (state.q ? ' for “' + state.q + '”' : '') +
         (filt ? ' (' + filt + ')' : '') + (r.mode === 'any' ? ' · matching any of the words' : '') +
         (r.ms && r.ms.total != null ? ' · ' + r.ms.total + ' ms' : '');
-      $('grid').innerHTML = lastHits.map(card).join('');
+      $('grid').innerHTML = lastHits.length ? lastHits.map(card).join('') :
+        '<p class="none">Nothing matched those words. The records hold what the catalogue printed and what the model saw; ' +
+        'try an artist, a title, a medium, a year, or a plainer description of the picture.</p>';
       renderFacets();
     }).catch(function (e) { $('status').textContent = 'Search failed: ' + e; });
   }
@@ -79,6 +103,7 @@
       $('tab-' + t).hidden = t !== name;
       document.querySelector('[data-tab="' + t + '"]').classList.toggle('on', t === name);
     });
+    if (name !== 'search') document.body.classList.remove('home');
   }
 
   function workBlock(w) {
@@ -93,10 +118,10 @@
     $('works-status').textContent = 'Loading…';
     getJSON('/api/works?min_books=2').then(function (r) {
       var ws = r.works || [];
-      var n = (r.total && r.total > ws.length) ? 'the ' + ws.length + ' most reproduced of ' + r.total + ' works' :
+      var n = (r.total && r.total > ws.length) ? 'The ' + ws.length + ' most reproduced of ' + r.total + ' works' :
         ws.length + ' works';
-      $('works-status').textContent = n + ' that appear in more than one catalogue (matched on artist ' +
-        'surname + title, so generic titles like “Landscape” can join different works).';
+      $('works-status').textContent = n + ' that appear in more than one catalogue, most reproduced first ' +
+        '(matched on artist surname + title, so generic titles like “Landscape” can join different works).';
       $('works').innerHTML = ws.map(workBlock).join('');
     });
   }
@@ -113,15 +138,23 @@
   function loadBooks() {
     $('books-status').textContent = 'Loading…';
     getJSON('/api/books').then(function (bs) {
-      $('books-status').textContent = bs.length + ' catalogues in this snapshot, 1929 to 2007, oldest first.';
-      $('books').innerHTML = bs.map(function (b) {
+      $('books-status').textContent = bs.length + ' catalogues in this snapshot, by decade.';
+      var out = '', decade = null, perDecade = {};
+      bs.forEach(function (b) { var d = Math.floor((parseInt(b.year, 10) || 0) / 10) * 10; perDecade[d] = (perDecade[d] || 0) + 1; });
+      bs.forEach(function (b) {
+        var d = Math.floor((parseInt(b.year, 10) || 0) / 10) * 10;
+        if (d !== decade) {
+          decade = d;
+          out += '<h2 class="decade">' + (d ? d + 's' : 'Undated') + ' <span>' + perDecade[d] + ' catalogues</span></h2>';
+        }
         var kinds = Object.keys(b.kinds || {}).slice(0, 3).join(', ');
-        return '<a class="book" href="#book=' + b.id + '">' +
+        out += '<a class="book" href="#book=' + b.id + '">' +
           (b.cover_url ? '<img loading="lazy" src="' + esc(b.cover_url) + '" alt="">' : '<img alt="">') +
           '<div><div class="t">' + esc(b.title) + '</div><div class="m">' + esc(b.year) + ' · ' + b.figures +
           ' figures on ' + b.pages_read + (b.pages ? ' / ' + b.pages : '') + ' pages' +
           (kinds ? '<br>' + esc(kinds) : '') + '</div></div></a>';
-      }).join('');
+      });
+      $('books').innerHTML = out;
     });
   }
 
@@ -138,7 +171,7 @@
     state = { q: p.get('q') || '', kind: p.get('kind') || '', artist: p.get('artist') || '', book: p.get('book') || '' };
     $('q').value = state.q;
     if (state.q || state.kind || state.artist || state.book) search();
-    else { $('grid').innerHTML = ''; $('facets').innerHTML = ''; $('status').textContent = ''; }
+    else showSample();
   }
 
   $('form').addEventListener('submit', function (e) {
@@ -161,10 +194,10 @@
   window.addEventListener('hashchange', route);
 
   getJSON('/api/stats').then(function (s) {
-    $('stats').innerHTML = fmt(s.figures) + ' figures from ' + fmt(s.pages) + ' pages of ' + s.books +
-      ' MoMA catalogues, read by Muse Spark · try <a href="#q=Picasso+Guernica">Picasso Guernica</a>, ' +
-      '<a href="#q=woman+reading">woman reading</a>, <a href="#q=still+life+apples">still life apples</a>, ' +
-      '<a href="#q=lithograph+1932">lithograph 1932</a>';
+    $('stats').innerHTML = s.books + ' scanned catalogues, ' + fmt(s.pages) + ' pages, ' + fmt(s.figures) +
+      ' pictures, each one found by SAM 3.1 and described by Muse Spark. Search by what a picture shows, by artist, ' +
+      'title, medium or year; follow a work across the <a href="#works">' + fmt(s.works_in_2plus_books) +
+      ' works</a> reproduced in more than one catalogue; open the page it was printed on.';
   }).catch(function () {});
   route();
 })();

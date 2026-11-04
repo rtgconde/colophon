@@ -3,7 +3,7 @@
   "framework": null,
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/:fn(search|work|works|books|stats|page)", "destination": "/api/index?fn=:fn" },
+    { "source": "/api/:fn(search|work|works|books|stats|page|sample)", "destination": "/api/index?fn=:fn" },
     { "source": "/page/:book(\\d+)/:page(\\d+)", "destination": "/page.html" }
   ],
   "headers": [

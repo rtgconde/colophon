@@ -4,7 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Colophon</title>
-<meta name="description" content="Every figure in 284 of MoMA's scanned exhibition catalogues, read by Muse Spark: search the pictures, follow a work across catalogues, open the page it was printed on.">
+<meta name="description" content="Every figure in 284 of MoMA's scanned exhibition catalogues, 1929 to 2007, read by Muse Spark: search the pictures, follow a work across catalogues, open the page it was printed on.">
+<meta property="og:title" content="Colophon">
+<meta property="og:description" content="Every figure in 284 of MoMA's exhibition catalogues, 1929 to 2007, found by SAM 3.1 and read by Muse Spark. Search the pictures, follow a work across catalogues, open the page it was printed on.">
+<meta property="og:image" content="https://colophon.rconde.tech/static/og.jpg">
+<meta property="og:url" content="https://colophon.rconde.tech/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/theme.js"></script>
 </head>
@@ -20,19 +27,44 @@
 </header>
 <div class="wrap">
   <section id="tab-search">
+    <section class="lede" id="lede">
+      <h1>Every figure in MoMA's exhibition catalogues, 1929 to 2007</h1>
+      <p class="lede-p" id="stats">284 scanned catalogues, 22,297 pages, 45,489 pictures, each one found and described by a model.
+        Search by what a picture shows, by artist, title, medium or year; follow a work across the catalogues that
+        reproduced it; open the page it was printed on.</p>
+    </section>
     <form class="search" id="form" role="search">
       <input id="q" type="search" autocomplete="off" placeholder="Search the figures: Picasso, a woman reading, still life, lithograph 1932…" aria-label="Search figures">
       <button type="submit">Search</button>
     </form>
-    <p class="hint" id="stats">Every figure read from MoMA's scanned exhibition catalogues.</p>
-    <p class="hint snapshot">This is the public copy of Colophon: a frozen snapshot of the 284 catalogues Muse Spark read, served
-      without the local machines that made it. Search here matches words in the records (artist, title, year, medium,
-      what the picture shows, the printed caption); the semantic search in the video runs on a local index.
-      <a href="https://github.com/rtgconde/colophon">How it was built</a>.</p>
+    <p class="chips" id="chips">Try
+      <a href="#q=Picasso+Guernica">Picasso Guernica</a>
+      <a href="#q=woman+reading">woman reading</a>
+      <a href="#q=still+life+apples">still life apples</a>
+      <a href="#q=photograph+1936">photograph 1936</a>
+      <a href="#q=lithograph+1932">lithograph 1932</a>
+      <a href="#q=Bauhaus">Bauhaus</a>
+      <a href="#q=city+street+at+night">city street at night</a>
+    </p>
     <div class="layout">
       <aside class="facets" id="facets"></aside>
       <div><p class="status" id="status"></p><div class="grid" id="grid"></div></div>
     </div>
+    <section class="how" id="how">
+      <h2>How it was made</h2>
+      <ol>
+        <li><b>SAM 3.1</b>, Meta's open-weight segmentation model, boxes every picture on every page of the 757 catalogues MoMA
+          gives away as PDFs: 77,750 pages, 93,527 figures, on three GPUs at home.</li>
+        <li><b>Muse Spark</b>, through the Meta Model API, reads each page with its boxes numbered and writes one record per
+          figure: what it shows, the caption as printed, artist, title, year, medium, credit.</li>
+        <li>The records become this index: the <a href="#q=Rayograph">search</a>, the <a href="#works">works</a> that
+          recur across catalogues, and the <a href="/page/13244/0074?k=0">page</a> each figure came from. A second pass
+          read the title pages and catalogued each book from its own evidence.</li>
+      </ol>
+      <p class="links"><a href="https://youtu.be/BdbA1Wr3TI0" rel="noopener">Watch the three-minute video</a> ·
+        <a href="https://github.com/rtgconde/colophon" rel="noopener">Read the code</a> ·
+        built in ten days for the Meta Global AI Developer Hackathon 2026</p>
+    </section>
   </section>
   <section id="tab-works" hidden>
     <p class="status" id="works-status"></p>
@@ -42,6 +74,9 @@
     <p class="status" id="books-status"></p>
     <div class="books" id="books"></div>
   </section>
+  <footer class="foot">A public copy of Colophon, frozen at the 284 catalogues Muse Spark read, served without the machines
+    that made it. Search here matches words in the records; the semantic search in the video runs on a local index.
+    Page images are web-sized copies of MoMA's free PDFs and link back to the scan.</footer>
 </div>
 <script src="/static/app.js"></script>
 </body>
