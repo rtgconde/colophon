@@ -2,6 +2,14 @@
 
 **Search a scanned library by what is in the pictures. Know what every scan is.**
 
+| | |
+|---|---|
+| **Try it** | <https://colophon.rconde.tech> — every figure in 284 of MoMA's exhibition catalogues, searchable, each with the page it was printed on |
+| **Watch it** | <https://youtu.be/BdbA1Wr3TI0> (2:53) |
+| **What it did** | 757 of the Museum of Modern Art's free catalogues, 77,750 pages, 1929–2016: SAM 3.1 found 93,527 figures; Muse Spark read 22,297 pages into 45,493 figure records and catalogued all 757 books from their own pages |
+| **How well** | against MoMA's own records: title 94 %, year 90 %, publisher 86 %, ISBN 92 %; one wrong date in the museum's records found and documented |
+| **What it cost** | $173 of Meta Model API: $0.0067 a page read, $0.031 a book identified |
+
 Type *a woman reading a letter* and get Seurat's drawing, the page it is on, the catalogue it is in, and a link to
 MoMA's own PDF at that page. Ask for a work and see every catalogue that reproduced it. Hand it a scan with no
 metadata and get back a catalogue record, with the page each field came from, verified against Open Library.
