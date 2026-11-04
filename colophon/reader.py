@@ -70,7 +70,7 @@ def draw_boxes(page_path, figures, long_side):
     return buf.getvalue(), im.size
 
 
-def read_page(client, root, book, page, figures, long_side, dry_dir=None):
+def read_page(client, root, book, page, figures, long_side, dry_dir=None, system_suffix="", temperature=None):
     page_path = f"{root}/pages/{book}/{page:04d}.jpg"
     jpg, size = draw_boxes(page_path, figures, long_side)
     if dry_dir:
@@ -81,11 +81,11 @@ def read_page(client, root, book, page, figures, long_side, dry_dir=None):
     ks = ", ".join(str(f["k"]) for f in figures)
     user = [text_part(f"Catalogue page {page}. Boxes drawn: {ks}. Image size {size[0]}x{size[1]}."),
             image_part(data=jpg)]
-    messages = [{"role": "developer", "content": DEVELOPER}, {"role": "user", "content": user}]
+    messages = [{"role": "developer", "content": DEVELOPER + system_suffix}, {"role": "user", "content": user}]
     t0 = time.time()
     try:
         r = client.chat(messages, schema=READ_PAGE, schema_name="PageReading", reasoning="minimal",
-                        max_tokens=6000, prompt_cache_key="colophon-read-v1")
+                        max_tokens=6000, prompt_cache_key="colophon-read-v1", temperature=temperature)
     except ChatError as e:
         return {"book": book, "page": page, "ok": False, "error": str(e)[:500], "elapsed_s": round(time.time() - t0, 2)}
     out = {"book": book, "page": page, "ok": r["json"] is not None, "model": r["model"], "elapsed_s": r["elapsed_s"],
@@ -111,9 +111,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--budget-usd", type=float, default=0, help="stop launching new pages past this spend")
+    ap.add_argument("--system-suffix", default="", help="text appended to the developer prompt (e.g. a local model's reasoning-strength line)")
+    ap.add_argument("--temperature", type=float, default=None, help="sampling temperature (local providers only; Meta ignores it)")
+    ap.add_argument("--timeout", type=int, default=240, help="seconds to wait for one page (local models on slow GPUs need more)")
     a = ap.parse_args()
 
-    client = None if a.dry_run else Client(provider=a.provider, base_url=a.base_url, model=a.model)
+    client = None if a.dry_run else Client(provider=a.provider, base_url=a.base_url, model=a.model, timeout=a.timeout)
     books = [int(x) for x in a.books.split(",")] if a.books else None
     jobs = []
     for fpath in sorted(glob.glob(f"{a.root}/figures/*/*.json")):
@@ -154,7 +157,7 @@ def main():
         with lock:                       # checked per call, so the cap holds within a run too
             if a.budget_usd and spent >= a.budget_usd:
                 return {"book": book, "page": page, "ok": False, "skipped": True, "error": "budget reached"}
-        res = read_page(client, a.root, book, page, figs, a.long_side, dry_dir)
+        res = read_page(client, a.root, book, page, figs, a.long_side, dry_dir, a.system_suffix, a.temperature)
         if not a.dry_run and not res.get("skipped"):
             os.makedirs(os.path.dirname(out), exist_ok=True)
             with open(out, "w") as f:

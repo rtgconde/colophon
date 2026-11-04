@@ -119,10 +119,11 @@ sudo ufw allow from <vpn-subnet> to any port 8102 proto tcp comment "Colophon se
 
 To remove them, run `sudo ufw status numbered` and then `sudo ufw delete <n>`, highest number first.
 
-## Numbers (2026-11-03, 14:08 UTC, the reads paused at $16.31)
+## Numbers (2026-11-04, the Muse Spark reads finished at $150.07)
 
-- **Index:** 2,915 pages read, 4,546 figures, 53 books, 260 works in 2 or more catalogues (4,546 Qdrant points).
-  The reads cover the oldest catalogues first (the queue is in year order): 1929 to 1938.
+- **Index:** 22,297 pages read by Muse Spark, 45,493 figures, 284 books (1929 to 2007, read in library-id order, not
+  year order), 796 works in 2 or more catalogues. The local Muse Glimmer reads are added as they land, each record
+  tagged with its model.
 - **Embedding rate:** about 20 figures/s on mlbox's CPU, in batches of 32.
 - **Query latency, from the Mac over the private network:** 55–85 ms end to end (embed ~50–60 ms, Qdrant ~5 ms). The first
   query after a tunnel opens takes ~1 s.

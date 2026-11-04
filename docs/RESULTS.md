@@ -1,7 +1,7 @@
 # Results on the demo set
 
 Everything below was measured on the 757 MoMA exhibition catalogues in the author's Calibre library (77,750 pages,
-published 1929–2016; `docs/demo-set.csv` lists them with their MoMA URLs). Dates are UTC, 2026-11-02/03. Nothing here
+published 1929–2016; `docs/demo-set.csv` lists them with their MoMA URLs). Dates are UTC, 2026-11-02 to 11-04. Nothing here
 is an estimate unless it says so.
 
 ## 1. Segmentation: SAM 3.1 on every page
@@ -36,35 +36,38 @@ boxes per prompt. The model is the SAM 3.1 Object Multiplex checkpoint (the fp16
 
 ## 2. Reading: Muse Spark 1.3 on the pages with figures
 
-The reads were stopped at $16.31, not finished, so they cover the oldest catalogues first (the queue is in year
-order).
+The reads ran until the API budget was reached ($150; 2026-11-03 03:52 to 11-04 02:12 UTC), in library-id order,
+which is not year order: the 284 catalogues read span 1929 to 2007 (52 from the 1930s, 66 from the 1980s). The
+remaining 26,650 illustrated pages are being read by Muse Glimmer 30B on local GPUs; those records carry their model
+name and are not counted in this section.
 
 | | |
 |---|---|
-| pages read (one call per page: the page image with the figure boxes drawn and numbered) | **2,915**, 0 failed |
-| catalogues touched | 53 (1929 → 1938 by publication year) |
-| boxes judged (`is_figure`) | 4,579: **4,547 figures**, 32 not figures (ornaments, rules, blank frames) |
-| page kinds | plates 2,540 · text with figures 345 · cover 23 · front matter 4 · text 1 · blank 1 · other 1 |
-| tokens | 9.41 M in, 1.44 M out |
-| cost | **$16.31**, $0.0056 per page |
-| seconds per page, median (8 in parallel) | 4.6 |
+| pages read (one call per page: the page image with the figure boxes drawn and numbered) | **22,297** of 22,311 sent; 14 failed (API errors, kept as records for a retry) |
+| catalogues touched | 284 (282 complete, 2 partial), 1929 → 2007 |
+| boxes judged (`is_figure`) | 45,896: **45,493 figures**, 403 not figures (ornaments, rules, blank frames) |
+| page kinds | plates 13,412 · text with figures 8,633 · cover 196 · text 20 · front matter 20 · other 7 · blank 6 · advert 3 |
+| tokens | 76.3 M in, 15.6 M out |
+| cost | **$150.07**, $0.0067 per page |
+| seconds per page, median (8 in parallel) | 5.3 |
 
 What the model called the figures:
 
 | kind | figures |
 |---|---|
-| painting | 1,776 |
-| sculpture | 598 |
-| photograph | 520 |
-| drawing | 498 |
-| print | 312 |
-| design object | 292 |
-| architecture | 245 |
-| diagram | 148 |
-| illustration | 97 |
-| other | 65 |
-| film still | 11 |
-| map | 9 |
+| painting | 11,929 |
+| drawing | 8,580 |
+| photograph | 6,227 |
+| sculpture | 5,774 |
+| print | 4,333 |
+| design object | 2,276 |
+| architecture | 1,956 |
+| illustration | 1,668 |
+| diagram | 1,065 |
+| other | 867 |
+| installation | 366 |
+| film still | 348 |
+| map | 104 |
 
 For every figure it also returned the caption as printed, the artist, title, year, medium, dimensions, credit line,
 a one-sentence `depicts`, and whether the box is a detail of a larger work. The schema is `READ_PAGE` in
@@ -74,9 +77,9 @@ a one-sentence `depicts`, and whether the box is a detail of a larger work. The 
 
 | | |
 |---|---|
-| figures in Qdrant (`colophon_figures`, bge-m3, 1024-d, cosine) | **4,546** |
-| pages, catalogues | 2,915 pages of 53 catalogues |
-| works reproduced in 2 or more catalogues (surname + title key) | **260** |
+| figures in Qdrant (`colophon_figures`, bge-m3, 1024-d, cosine) | **45,493** from Muse Spark; the live index also takes the local Muse Glimmer reads as they land (62,583 figures at 18:23 UTC on 11-04) |
+| pages, catalogues | 22,297 pages of 284 catalogues (Muse Spark) |
+| works reproduced in 2 or more catalogues (surname + title key) | **796** in the Muse Spark set (1,177 in the live index at the same moment) |
 | embedding rate (infinity, bge-m3, mlbox's CPU) | ~20 figures/s |
 | query, end to end over the private network | 55–85 ms (embed 50–60 ms, Qdrant ~5 ms) |
 
@@ -130,11 +133,14 @@ The scoring rules, and the 20-book and 3-book runs that shaped the prompt, are i
 
 | | |
 |---|---|
-| page reads | $16.31 |
+| page reads | $150.07 |
 | identifier | $23.21 |
-| **total Meta Model API** | **$39.52** (cap $100) |
+| **total Meta Model API** | **$173.28** |
 | SAM 3.1, bge-m3, Qdrant, rendering | local hardware, $0 |
 
 Three guards kept the cap: the reader's `--budget-usd`, a **total** recomputed from every cost file before each call;
 `spend-guard.sh`, an independent loop that sums the same files every 5 min and kills every API user at $98; and the
-key itself, which the owner can delete. The file totals agreed with Meta's billing page to within a dollar.
+key itself, which the owner can delete. The cap was $100 for the build ($39.52 spent by the end of 11-03 03:50 UTC); when Meta's $150 free credits arrived
+the reads were resumed against them, with the reader's budget at $150 and the guard at $178. The first $40.28 was
+paid by card; the per-call records ran about 2 % under Meta's billing page on that first $40 ($39.52), so expect the
+same small gap on the total.

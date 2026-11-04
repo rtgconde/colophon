@@ -10,7 +10,8 @@ Built on two Meta models: **SAM 3.1** finds every picture on every page, locally
 the captions and the title pages through the Meta Model API. The demo set is the **757 out-of-print exhibition
 catalogues the Museum of Modern Art serves free as PDFs**: 77,750 pages, 1929–2016.
 
-Demo video: *link added at submission* (made with the tooling in `demo/`). The live instance runs on the author's home
+Demo video: <https://youtu.be/BdbA1Wr3TI0> (made with the tooling in `demo/`; recorded on 2026-11-03, when 53
+catalogues had been read, so the counts on screen are lower than the final ones in the table below). The live instance runs on the author's home
 network; the video, the screenshots below and `docs/RESULTS.md` are the evidence, and everything needed to rebuild it
 from MoMA's PDFs is in this repository. Built for the Meta Global AI Developer Hackathon 2026, indie track, theme
 *Build for Your World*, over 2–3 November.
@@ -22,10 +23,10 @@ from MoMA's PDFs is in this repository. Built for the Meta Global AI Developer H
   and an RTX 4090 behind a coordinator any machine can join or leave. 93,527 figures, 0 failures.
 - **Captions read in context.** Muse Spark sees the whole page with the figures numbered, not crops, so it reads each
   printed caption as artist, title, year, medium and credit, says what the picture depicts, and can tell a detail
-  from a work. Strict JSON, one call per page, half a cent.
+  from a work. Strict JSON, one call per page, two thirds of a cent.
 - **Works followed across catalogues.** Figures join on the artist's surname and the title as read, so Picasso's
-  *Green Still Life* turns up in six catalogues from 1931 to 1936, each a different plate. 260 works in two or more
-  catalogues so far. Which catalogue reproduced a work, and on which page, was not an index anyone had.
+  *Green Still Life* turns up in six catalogues from 1931 to 1936, each a different plate. 796 works in two or more
+  catalogues. Which catalogue reproduced a work, and on which page, was not an index anyone had.
 - **An identifier with evidence.** The title page, the copyright page and the last pages go in; a record with the
   page each field came from comes out. Nothing is guessed: a field not printed is left empty, with a note. ISBNs are
   checksum-tested, and a record is *verified* only when Open Library's title for it matches the title page, a rule
@@ -51,10 +52,11 @@ is in `docs/RESULTS.md`.
 | stage | result |
 |---|---|
 | SAM 3.1 segmentation | all 77,750 pages in 5 h 12 min on three machines, 0 failures; **93,527 figures** on 48,961 pages |
-| Muse Spark page reads | 2,915 pages read (the oldest 53 catalogues): **4,546 figures** with artist, title, year, medium and caption; $16.31 |
-| search index | 4,546 figures in Qdrant; **260 works** found reproduced in two or more catalogues; a query answers in 55–85 ms |
+| Muse Spark page reads | 22,297 pages read (284 catalogues, 282 of them complete; 14 pages failed): **45,493 figures** with artist, title, year, medium and caption; $150.07 |
+| search index | 45,493 Muse Spark figures in Qdrant; **796 works** found reproduced in two or more catalogues; a query answers in 55–85 ms |
 | identifier, gold test on all 757 books | title **94 %** (75 % strict), year **90 %** (81 % strict), publisher **86 %**, author **85 %** (40 % strict), ISBN **92 %**; 169 records verified against Open Library; $23.21 |
-| Meta Model API | **$0.0056 per page read, $0.031 per book identified**; $39.52 for everything above |
+| Meta Model API | **$0.0067 per page read, $0.031 per book identified**; $173.28 for everything above |
+| after the API budget | the remaining 26,650 illustrated pages are being read by **Muse Glimmer 30B**, Meta's open-weight model, on the same local GPUs through Ollama with the same schema (`reader.py --provider local`); every record carries its model name, and those reads are not counted above |
 
 The *gold* is MoMA's own catalogue-record sheet, which is page 1 of every PDF; the identifier never saw it
 (`--skip-first 1`). *Strict* is a plain comparison. *Convention-aware* accepts MoMA's cataloguing habits: the series
@@ -75,7 +77,7 @@ catalogue and the page. The facets are built from the hits.*
 ![Works reproduced in more than one catalogue](docs/img/works.jpg)
 
 *Works: the same painting wherever MoMA reproduced it, matched on the artist's surname and the title read from the
-captions. 260 works across the 53 catalogues read so far.*
+captions. 796 works across the 284 catalogues Muse Spark read.*
 
 ![What Muse Spark is sent: the page with its figures numbered](docs/img/reader-input.jpg)
 
@@ -191,8 +193,9 @@ page 1**: a ready-made gold standard for the identifier that the model can be ke
 
 ## Limits
 
-- **The index covers 53 of the 757 catalogues.** The reads were stopped there; the pipeline is complete, and
-  reading the remaining 46,000 illustrated pages costs about $260 at the measured rate.
+- **Muse Spark read 284 of the 757 catalogues** (22,297 pages) before the API budget was reached. Reading the
+  remaining 26,650 illustrated pages would cost about $180 at the measured rate; they are being read locally by Muse
+  Glimmer 30B instead (`deploy/hub/local-read.sh`), at about 13 pages a minute on three GPUs, into the same index.
 - **Artist spellings vary with the captions** ("LAUTREC", "TOULOUSE-LAUTREC"), so the artist facet splits them;
   the Works key uses the surname, so those still join. Generic titles ("Landscape") join different works; the Works
   view shows the crops side by side so a person can tell.
