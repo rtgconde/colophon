@@ -69,6 +69,18 @@
     var nav = [];
     if (d.prev != null) nav.push('<a href="/page/' + book + '/' + pad(d.prev) + '?k=0">← previous page</a>');
     if (d.next != null) nav.push('<a href="/page/' + book + '/' + pad(d.next) + '?k=0">next page →</a>');
+    nav.push('<a href="/api/random">a random page</a>');
+    var card = function (h) {
+      var t = h.title ? esc(h.title) : esc((h.depicts || 'Untitled').slice(0, 70));
+      return '<a class="card" href="' + esc(h.view) + '"><div class="im"><img loading="lazy" src="' + esc(h.thumb_url) +
+        '" alt="' + esc(h.depicts || '') + '"></div><div class="t' + (h.title ? '' : ' untitled') + '">' + t + '</div>' +
+        (h.artist ? '<div class="a">' + esc(h.artist) + '</div>' : '') +
+        '<div class="b">' + esc(h.book_title || '') + (h.book_year ? ', ' + esc(h.book_year) : '') + ' · p. ' + h.page + '</div></a>';
+    };
+    var sim = (d.similar && d.similar[String(k)]) || [];
+    var simHtml = sim.length ? '<section class="pv-sim"><h2>More like this</h2><div class="strip">' + sim.map(card).join('') +
+      '</div><p class="sub">The nearest figures in the index by what they show and how they are described, computed once from ' +
+      'the embeddings of every record; the same work in another catalogue usually comes first.</p></section>' : '';
     pv.innerHTML =
       '<figure class="pv-img"><img src="' + esc(p.image) + '" alt="Page ' + page + ' of ' + esc(b.title) + ', figure ' + k + ' outlined">' +
       '<div class="boxes">' + boxes + '</div></figure>' +
@@ -82,7 +94,7 @@
       '<p class="pnav">' + nav.join(' · ') + '</p>' +
       '<p class="meta">page kind: ' + esc(p.page_kind || '?') + ' · read by ' + esc(p.model || '?') +
       ' · <a href="/#book=' + esc(b.id) + '">all figures in this catalogue</a></p>' +
-      '</section>';
+      '</section>' + simHtml;
   }).catch(function (e) { pv.innerHTML = '<p class="status">Failed: ' + esc(e) + '</p>'; });
 })();
 </script>

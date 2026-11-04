@@ -14,7 +14,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 WEB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUBLIC = os.path.join(WEB, "public")
-ROUTES = ("search", "work", "works", "books", "stats", "page", "sample")
+ROUTES = ("search", "work", "works", "books", "stats", "page", "sample", "random")
 
 
 def load_api():

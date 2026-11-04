@@ -153,3 +153,12 @@ body.home .status { font: 600 12px/1 var(--sans); text-transform: uppercase; let
   .lede-p { font-size: 14px; }
   .how { margin-top: 36px; }
 }
+
+/* more like this, under the page view */
+.pv-sim { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 8px; }
+.pv-sim h2 { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+.pv-sim .strip { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+.pv-sim .strip .card { flex: none; width: 160px; }
+.pv-sim .sub { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+.chips a.rnd { border-style: dashed; color: var(--muted); }
+.chips a.rnd:hover { color: var(--fg); }

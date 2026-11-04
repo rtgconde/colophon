@@ -15,6 +15,7 @@ no vector store, nothing reaches the machines that made the data: search here is
 """
 import json
 import os
+import random
 import re
 import sqlite3
 import time
@@ -241,10 +242,31 @@ def page(q):
                 nb[str(f["k"])] = n
     prev = db().execute("SELECT MAX(page) FROM pages WHERE book=? AND page<?", (book, pg)).fetchone()[0]
     nxt = db().execute("SELECT MIN(page) FROM pages WHERE book=? AND page>?", (book, pg)).fetchone()[0]
+    # "More like this": the nearest neighbours of each figure, computed once from the local embeddings
+    # (tools/neighbors.py); the snapshot carries them so no model runs here.
+    similar = {}
+    for f in figs:
+        r = db().execute("SELECT near FROM neighbors WHERE book=? AND page=? AND k=?",
+                         (book, pg, f["k"])).fetchone()
+        hits = []
+        for nb_, np_, nk_, score in (json.loads(r["near"]) if r else []):
+            x = db().execute("SELECT payload FROM figures WHERE book=? AND page=? AND k=?", (nb_, np_, nk_)).fetchone()
+            if x:
+                hits.append(hit_json(json.loads(x["payload"]), score))
+        similar[str(f["k"])] = hits
     return {"book": book_json(b),
             "page": {"book": book, "page": pg, "page_kind": p["page_kind"], "lang": p["lang"], "width": p["width"],
                      "height": p["height"], "model": p["model"], "image": page_url(book, pg)},
-            "figures": figs, "works": nb, "prev": prev, "next": nxt, "links": links_for(b, pg)}
+            "figures": figs, "works": nb, "similar": similar, "prev": prev, "next": nxt, "links": links_for(b, pg)}
+
+
+def random_page(q):
+    """A random page with at least one figure, as a redirect to its page view: the breadth of the index, not its best."""
+    top = db().execute("SELECT MAX(rowid) FROM figures").fetchone()[0]
+    r = db().execute("SELECT book, page FROM figures WHERE rowid >= ? ORDER BY rowid LIMIT 1",
+                     (random.randint(1, top),)).fetchone()
+    k = db().execute("SELECT MIN(k) FROM figures WHERE book=? AND page=?", (r["book"], r["page"])).fetchone()[0]
+    return {"_redirect": f"/page/{r['book']}/{r['page']:04d}?k={k}"}
 
 
 # The opening grid: two dozen figures picked by eye from the works that recur across catalogues, mixing colour
@@ -265,7 +287,7 @@ def sample(q):
 
 
 ROUTES = {"search": search, "work": work, "works": works, "books": books, "stats": stats, "page": page,
-          "sample": sample}
+          "sample": sample, "random": random_page}
 
 
 class handler(BaseHTTPRequestHandler):
@@ -282,6 +304,13 @@ class handler(BaseHTTPRequestHandler):
             return self.reply({"error": f"{fn}: {e!r}"}, 500)
         if isinstance(out, tuple):
             return self.reply(out[0], out[1])
+        if isinstance(out, dict) and "_redirect" in out:
+            self.send_response(302)
+            self.send_header("Location", out["_redirect"])
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         return self.reply(out)
 
     def reply(self, obj, code=200):
